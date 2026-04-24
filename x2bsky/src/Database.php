@@ -137,6 +137,27 @@ class Database
         ');
 
         $pdo->exec('
+            CREATE TABLE IF NOT EXISTS fetched_posts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                x_post_id TEXT UNIQUE NOT NULL,
+                x_post_url TEXT,
+                text TEXT NOT NULL,
+                text_hash TEXT NOT NULL,
+                is_retweet BOOLEAN DEFAULT FALSE,
+                is_quote BOOLEAN DEFAULT FALSE,
+                original_author TEXT,
+                media_json TEXT,
+                x_created_at DATETIME,
+                fetched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                synced BOOLEAN DEFAULT FALSE,
+                synced_at DATETIME,
+                synced_bsky_uri TEXT,
+                skipped BOOLEAN DEFAULT FALSE,
+                skipped_at DATETIME
+            )
+        ');
+
+        $pdo->exec('
             CREATE INDEX IF NOT EXISTS idx_synced_x_post_id ON synced_posts(x_post_id)
         ');
         $pdo->exec('

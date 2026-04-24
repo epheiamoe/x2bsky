@@ -91,6 +91,9 @@ class Settings
             'cron_enabled' => false,
             'cron_interval' => 5,
             'sync_count' => 10,
+            'sync_include_rts' => false,
+            'sync_include_quotes' => true,
+            'fetch_default_count' => 20,
         ];
 
         foreach ($defaults as $key => $value) {

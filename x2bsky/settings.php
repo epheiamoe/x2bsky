@@ -38,10 +38,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cronEnabled = isset($_POST['cron_enabled']);
         $cronInterval = max(1, min(60, (int)($_POST['cron_interval'] ?? 5)));
         $syncCount = max(5, min(100, (int)($_POST['sync_count'] ?? 10)));
+        $syncIncludeRts = isset($_POST['sync_include_rts']);
+        $syncIncludeQuotes = isset($_POST['sync_include_quotes']);
+        $fetchDefaultCount = max(5, min(100, (int)($_POST['fetch_default_count'] ?? 20)));
 
         Settings::set('cron_enabled', $cronEnabled);
         Settings::set('cron_interval', $cronInterval);
         Settings::set('sync_count', $syncCount);
+        Settings::set('sync_include_rts', $syncIncludeRts);
+        Settings::set('sync_include_quotes', $syncIncludeQuotes);
+        Settings::set('fetch_default_count', $fetchDefaultCount);
 
         $success = 'Sync settings saved successfully';
         $activeTab = 'sync';
@@ -51,6 +57,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $cronEnabled = Settings::get('cron_enabled', false);
 $cronInterval = Settings::get('cron_interval', 5);
 $syncCount = Settings::get('sync_count', 10);
+$syncIncludeRts = Settings::get('sync_include_rts', false);
+$syncIncludeQuotes = Settings::get('sync_include_quotes', true);
+$fetchDefaultCount = Settings::get('fetch_default_count', 20);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -146,6 +155,44 @@ $syncCount = Settings::get('sync_count', 10);
                         class="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                     <p class="text-xs text-slate-500 mt-1">Number of recent posts to fetch each sync (5-100)</p>
+                </div>
+
+                <div class="flex items-center">
+                    <input
+                        type="checkbox"
+                        id="sync_include_rts"
+                        name="sync_include_rts"
+                        value="1"
+                        <?= $syncIncludeRts ? 'checked' : '' ?>
+                        class="w-5 h-5 rounded border-slate-600 bg-slate-900 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                    >
+                    <label for="sync_include_rts" class="ml-3 text-slate-300">Include Retweets (RT)</label>
+                </div>
+
+                <div class="flex items-center">
+                    <input
+                        type="checkbox"
+                        id="sync_include_quotes"
+                        name="sync_include_quotes"
+                        value="1"
+                        <?= $syncIncludeQuotes ? 'checked' : '' ?>
+                        class="w-5 h-5 rounded border-slate-600 bg-slate-900 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                    >
+                    <label for="sync_include_quotes" class="ml-3 text-slate-300">Include Quotes (with link)</label>
+                </div>
+
+                <div>
+                    <label for="fetch_default_count" class="block text-sm font-medium text-slate-300 mb-2">Fetch Count</label>
+                    <input
+                        type="number"
+                        id="fetch_default_count"
+                        name="fetch_default_count"
+                        value="<?= (int)$fetchDefaultCount ?>"
+                        min="5"
+                        max="100"
+                        class="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                    <p class="text-xs text-slate-500 mt-1">Posts to fetch per fetch operation (5-100, cost ~$0.002 per post)</p>
                 </div>
 
                 <button

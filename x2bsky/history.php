@@ -56,6 +56,7 @@ $totalPages = ceil($totalPosts / $perPage);
                     <h1 class="text-xl font-bold text-white">x2bsky</h1>
                     <div class="hidden md:flex space-x-6">
                         <a href="index.php" class="text-slate-400 hover:text-white transition">Dashboard</a>
+                        <a href="fetch.php" class="text-slate-400 hover:text-white transition">Fetch & Sync</a>
                         <a href="history.php" class="text-white font-medium">History</a>
                         <a href="settings.php" class="text-slate-400 hover:text-white transition">Settings</a>
                     </div>

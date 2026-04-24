@@ -68,9 +68,9 @@ class XApiClient
 
         $params = [
             'max_results' => min(max($maxResults, 5), 100),
-            'tweet.fields' => 'id,text,created_at,entities,attachments,possibly_sensitive',
+            'tweet.fields' => 'id,text,created_at,entities,attachments,possibly_sensitive,referenced_tweets,edit_history_tweet_ids',
             'expansions' => 'attachments.media_keys',
-            'media.fields' => 'url,preview_image_url,type,duration_ms,width,height,alt_text',
+            'media.fields' => 'url,preview_image_url,type,duration_ms,width,height,alt_text,media_key',
         ];
 
         if ($sinceId) {
@@ -134,6 +134,115 @@ class XApiClient
 
         Logger::info('Fetched tweets', ['count' => count($tweets)]);
         return $tweets;
+    }
+
+    public function fetchUserTweets(int $maxResults = 20, ?string $sinceId = null): array
+    {
+        $url = "https://api.twitter.com/2/users/{$this->userId}/tweets";
+
+        $params = [
+            'max_results' => min(max($maxResults, 5), 100),
+            'tweet.fields' => 'id,text,created_at,entities,attachments,possibly_sensitive,referenced_tweets,edit_history_tweet_ids,author_id',
+            'expansions' => 'attachments.media_keys',
+            'media.fields' => 'url,preview_image_url,type,duration_ms,width,height,alt_text,media_key',
+        ];
+
+        if ($sinceId) {
+            $params['since_id'] = $sinceId;
+        }
+
+        $queryString = http_build_query($params);
+        $fullUrl = $url . '?' . $queryString;
+
+        $headers = [
+            "Authorization: Bearer {$this->bearerToken}",
+            'Content-Type: application/json',
+        ];
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => implode("\r\n", $headers),
+                'ignore_errors' => true,
+            ]
+        ]);
+
+        $response = file_get_contents($fullUrl, false, $context);
+
+        if ($response === false) {
+            Logger::error('X API fetch failed', ['url' => $fullUrl]);
+            return [];
+        }
+
+        $data = json_decode($response, true);
+
+        if (isset($data['errors'])) {
+            Logger::error('X API error', ['errors' => $data['errors']]);
+            return [];
+        }
+
+        if (!isset($data['data'])) {
+            return [];
+        }
+
+        $tweets = $data['data'] ?? [];
+        $includes = $data['includes'] ?? [];
+        $medias = $includes['media'] ?? [];
+
+        $mediaMap = [];
+        foreach ($medias as $media) {
+            $mediaMap[$media['media_key']] = $media;
+        }
+
+        $filteredTweets = [];
+        foreach ($tweets as $tweet) {
+            $postType = $this->getPostType($tweet);
+
+            if ($postType === 'replied_to') {
+                continue;
+            }
+
+            $tweet['_post_type'] = $postType;
+            $tweet['_media'] = [];
+
+            if (isset($tweet['attachments']['media_keys'])) {
+                foreach ($tweet['attachments']['media_keys'] as $key) {
+                    if (isset($mediaMap[$key])) {
+                        $tweet['_media'][] = $mediaMap[$key];
+                    }
+                }
+            }
+
+            $filteredTweets[] = $tweet;
+        }
+
+        Logger::info('Fetched and filtered tweets', [
+            'total' => count($tweets),
+            'filtered' => count($filteredTweets)
+        ]);
+
+        return $filteredTweets;
+    }
+
+    private function getPostType(array $tweet): string
+    {
+        if (!isset($tweet['referenced_tweets'])) {
+            return 'original';
+        }
+
+        foreach ($tweet['referenced_tweets'] as $ref) {
+            if ($ref['type'] === 'replied_to') {
+                return 'replied_to';
+            }
+            if ($ref['type'] === 'retweeted') {
+                return 'retweeted';
+            }
+            if ($ref['type'] === 'quoted') {
+                return 'quoted';
+            }
+        }
+
+        return 'original';
     }
 
     public function downloadMedia(string $url, string $savePath): bool
