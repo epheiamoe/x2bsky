@@ -1,0 +1,12 @@
+.env
+.env.backup
+/vendor/
+/data/*.db
+/data/*.db-journal
+/data/.remember_token
+/data/bsky_session.json
+/logs/
+/var/log/
+*.log
+.DS_Store
+Thumbs.db

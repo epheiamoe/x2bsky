@@ -1,0 +1,16 @@
+[Unit]
+Description=x2bsky Worker
+After=network.target
+
+[Service]
+Type=simple
+User=www
+WorkingDirectory=/www/wwwroot/x2bsky.desuwa.org
+ExecStart=/usr/bin/php /www/wwwroot/x2bsky.desuwa.org/worker.php
+Restart=always
+RestartSec=10
+StandardOutput=append:/www/wwwroot/x2bsky.desuwa.org/logs/worker.log
+StandardError=append:/www/wwwroot/x2bsky.desuwa.org/logs/worker_error.log
+
+[Install]
+WantedBy=multi-user.target
