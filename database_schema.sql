@@ -105,10 +105,15 @@ CREATE TABLE `queue` (
   `x_post_id` varchar(64) NOT NULL,
   `post_data` text,
   `priority` int DEFAULT 0,
+  `status` varchar(16) DEFAULT 'pending',
+  `attempts` int DEFAULT 0,
+  `max_attempts` int DEFAULT 5,
   `process_after` datetime DEFAULT CURRENT_TIMESTAMP,
+  `processed_at` datetime DEFAULT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_queue_process_after` (`process_after`)
+  KEY `idx_queue_process_after` (`process_after`),
+  KEY `idx_queue_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================
