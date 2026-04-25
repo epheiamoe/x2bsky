@@ -225,13 +225,29 @@ class XApiClient
             }
 
             if ($postType === 'retweeted' && isset($tweet['referenced_tweets'])) {
+                $foundMedia = false;
                 foreach ($tweet['referenced_tweets'] as $ref) {
-                    if ($ref['type'] === 'retweeted' && isset($ref['id']) && isset($tweetMap[$ref['id']])) {
-                        $originalTweet = $tweetMap[$ref['id']];
-                        if (isset($originalTweet['attachments']['media_keys'])) {
-                            foreach ($originalTweet['attachments']['media_keys'] as $key) {
-                                if (isset($mediaMap[$key])) {
-                                    $tweet['_media'][] = $mediaMap[$key];
+                    if ($ref['type'] === 'retweeted' && isset($ref['id'])) {
+                        $originalTweetId = $ref['id'];
+
+                        if (isset($tweetMap[$originalTweetId])) {
+                            $originalTweet = $tweetMap[$originalTweetId];
+                            if (isset($originalTweet['attachments']['media_keys'])) {
+                                foreach ($originalTweet['attachments']['media_keys'] as $key) {
+                                    if (isset($mediaMap[$key])) {
+                                        $tweet['_media'][] = $mediaMap[$key];
+                                        $foundMedia = true;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (empty($tweet['_media'])) {
+                            $originalTweetData = $this->getTweetById($originalTweetId);
+                            if ($originalTweetData && isset($originalTweetData['includes']['media'])) {
+                                foreach ($originalTweetData['includes']['media'] as $media) {
+                                    $tweet['_media'][] = $media;
+                                    $foundMedia = true;
                                 }
                             }
                         }
@@ -287,6 +303,46 @@ class XApiClient
         }
 
         return 'original';
+    }
+
+    public function getTweetById(string $tweetId): ?array
+    {
+        $url = "https://api.twitter.com/2/tweets/$tweetId";
+        $params = [
+            'tweet.fields' => 'id,text,created_at,entities,attachments,referenced_tweets,author_id',
+            'expansions' => 'attachments.media_keys',
+            'media.fields' => 'url,preview_image_url,type,duration_ms,width,height,alt_text,media_key',
+        ];
+
+        $queryString = http_build_query($params);
+        $fullUrl = $url . '?' . $queryString;
+
+        $headers = [
+            "Authorization: Bearer {$this->bearerToken}",
+            'Content-Type: application/json',
+        ];
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => implode("\r\n", $headers),
+                'ignore_errors' => true,
+            ]
+        ]);
+
+        $response = file_get_contents($fullUrl, false, $context);
+
+        if ($response === false) {
+            return null;
+        }
+
+        $data = json_decode($response, true);
+
+        if (isset($data['errors']) || !isset($data['data'])) {
+            return null;
+        }
+
+        return $data;
     }
 
     public function downloadMedia(string $url, string $savePath): bool
