@@ -41,9 +41,12 @@ scp -r local/api/* myvps:/www/wwwroot/x2bsky.desuwa.org/api/
 - 文件: `src/Api/BlueskyClient.php`
 - 重要方法:
   - `authenticate()` - 创建 session
-  - `createPost()` - 创建帖子
+  - `createPost()` - 创建帖子（参数: text, embed, replyTo）
+    - `$replyTo` 可以是字符串（URI）或数组（带 CID 的回复对象）
+    - 线程创建时必须传递 `['parent' => ['uri' => ..., 'cid' => ...], 'root' => ['uri' => ..., 'cid' => ...]]`
   - `uploadBlob()` - 上传媒体（**必须用 binary 方式**）
   - `getLastError()` - 获取最后错误
+- `createPost()` 返回数组包含: `uri`, `cid`, `commit`
 
 ### X API 调用
 - 文件: `src/Api/XApiClient.php`
@@ -87,6 +90,11 @@ scp -r local/api/* myvps:/www/wwwroot/x2bsky.desuwa.org/api/
 #### "Invalid app.bsky.feed.post record"
 - 原因: createdAt 格式错误
 - 解决: 使用 `gmdate('Y-m-d\TH:i:s.v\Z')` 生成 UTC 时间戳
+
+#### "Expected object value type... at $.record.reply.root" 或 "Missing required key \"cid\""
+- 原因: 创建线程回复时，`reply.root` 和 `reply.parent` 需要 `{uri, cid}` 对象格式
+- 解决: `createPost()` 的 `$replyTo` 参数需要传递数组 `['parent' => ['uri' => $uri, 'cid' => $cid], 'root' => ['uri' => $uri, 'cid' => $cid]]`
+- 参考: `api/sync.php` 中的实现
 
 ### MySQL 错误
 
