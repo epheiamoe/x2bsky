@@ -97,6 +97,21 @@ CREATE TABLE `settings` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================
+-- queue - 同步队列表
+-- =====================================================
+CREATE TABLE `queue` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `job_id` varchar(64) NOT NULL,
+  `x_post_id` varchar(64) NOT NULL,
+  `post_data` text,
+  `priority` int DEFAULT 0,
+  `process_after` datetime DEFAULT CURRENT_TIMESTAMP,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_queue_process_after` (`process_after`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
 -- logs - 日志表
 -- =====================================================
 CREATE TABLE `logs` (
