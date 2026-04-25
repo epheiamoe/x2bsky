@@ -216,7 +216,7 @@ class BlueskyClient
         return null;
     }
 
-    public function createPost(string $text, ?array $embed = null, ?string $replyTo = null): ?array
+    public function createPost(string $text, ?array $embed = null, $replyTo = null): ?array
     {
         $record = [
             '$type' => 'app.bsky.feed.post',
@@ -229,7 +229,23 @@ class BlueskyClient
         }
 
         if ($replyTo) {
-            $record['reply'] = ['parent' => $replyTo, 'root' => $replyTo];
+            if (is_string($replyTo)) {
+                $record['reply'] = [
+                    'parent' => ['uri' => $replyTo],
+                    'root' => ['uri' => $replyTo],
+                ];
+            } elseif (is_array($replyTo)) {
+                if (isset($replyTo['uri'])) {
+                    $record['reply'] = $replyTo;
+                } elseif (isset($replyTo['parent']) && isset($replyTo['root'])) {
+                    $parent = is_string($replyTo['parent']) ? ['uri' => $replyTo['parent']] : $replyTo['parent'];
+                    $root = is_string($replyTo['root']) ? ['uri' => $replyTo['root']] : $replyTo['root'];
+                    $record['reply'] = [
+                        'parent' => $parent,
+                        'root' => $root,
+                    ];
+                }
+            }
         }
 
         $data = [
@@ -264,7 +280,7 @@ class BlueskyClient
                 $replyRef = ['parent' => $parentUri, 'root' => $rootUri];
             }
 
-            $result = $this->createPost($post['text'], $embed, $replyRef ? json_encode($replyRef) : null);
+            $result = $this->createPost($post['text'], $embed, $replyRef);
 
             if ($result) {
                 $uri = $result['uri'];

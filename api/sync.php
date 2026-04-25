@@ -117,7 +117,9 @@ try {
         $segments = TextProcessor::addThreadNotation($segments);
 
         $parentUri = null;
+        $parentCid = null;
         $rootUri = null;
+        $rootCid = null;
         $postUris = [];
         $segmentErrors = [];
         $totalSegments = count($segments);
@@ -146,19 +148,25 @@ try {
 
             $replyRef = null;
             if ($parentUri) {
-                $replyRef = ['parent' => $parentUri, 'root' => $rootUri];
+                $replyRef = [
+                    'parent' => ['uri' => $parentUri, 'cid' => $parentCid],
+                    'root' => ['uri' => $rootUri, 'cid' => $rootCid],
+                ];
             }
 
             $segmentText = $segment['text'];
 
-            $result = $bsky->createPost($segmentText, $embed, $replyRef ? json_encode($replyRef) : null);
+            $result = $bsky->createPost($segmentText, $embed, $replyRef);
 
-            if ($result && isset($result['uri'])) {
+            if ($result && isset($result['uri']) && isset($result['cid'])) {
                 $uri = $result['uri'];
+                $cid = $result['cid'];
                 if ($i === 0) {
                     $rootUri = $uri;
+                    $rootCid = $cid;
                 }
                 $parentUri = $uri;
+                $parentCid = $cid;
                 $postUris[] = $uri;
             } else {
                 $segmentErrors[] = sprintf('Segment %d/%d failed: %s', $i + 1, $totalSegments, $bsky->getLastError() ?? 'Unknown error');
