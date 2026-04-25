@@ -149,8 +149,7 @@ try {
                 $replyRef = ['parent' => $parentUri, 'root' => $rootUri];
             }
 
-            $progressNote = $totalSegments > 1 ? sprintf(' [%d/%d]', $i + 1, $totalSegments) : '';
-            $segmentText = $segment['text'] . $progressNote;
+            $segmentText = $segment['text'];
 
             $result = $bsky->createPost($segmentText, $embed, $replyRef ? json_encode($replyRef) : null);
 

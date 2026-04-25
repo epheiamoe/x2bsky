@@ -322,7 +322,16 @@ function getMimeType(string $path): string {
                             body: JSON.stringify({ url: this.mediaUrls[index] })
                         });
 
-                        const data = await response.json();
+                        const contentType = response.headers.get('content-type') || '';
+                        let data;
+                        if (contentType.includes('application/json')) {
+                            data = await response.json();
+                        } else {
+                            const text = await response.text();
+                            this.error = 'Server error: ' + text.substring(0, 100);
+                            this.loadingIndex = null;
+                            return;
+                        }
 
                         if (data.success && data.data) {
                             this.loadedImages[index] = 'data:' + data.mimeType + ';base64,' + data.data;
@@ -349,10 +358,12 @@ function getMimeType(string $path): string {
                                 body: JSON.stringify({ url: this.mediaUrls[i] })
                             });
 
-                            const data = await response.json();
-
-                            if (data.success && data.data) {
-                                this.loadedImages[i] = 'data:' + data.mimeType + ';base64,' + data.data;
+                            const contentType = response.headers.get('content-type') || '';
+                            if (contentType.includes('application/json')) {
+                                const data = await response.json();
+                                if (data.success && data.data) {
+                                    this.loadedImages[i] = 'data:' + data.mimeType + ';base64,' + data.data;
+                                }
                             }
                         }
 

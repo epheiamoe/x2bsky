@@ -37,34 +37,37 @@ class TextProcessor
                 }
 
                 $sentences = preg_split('/(?<=[.!?。！？])\s+/', $paragraph);
-                if ($sentences === false) {
-                    $sentences = [$paragraph];
-                }
-
-                $currentSubSegment = '';
-                foreach ($sentences as $sentence) {
-                    $sentence = trim($sentence);
-                    if ($sentence === '') {
-                        continue;
+                if ($sentences === false || count($sentences) <= 1) {
+                    $chunks = self::chunkByLength($paragraph, $maxChars);
+                    foreach ($chunks as $chunk) {
+                        $segments[] = $chunk;
                     }
-
-                    $sentenceLen = mb_strlen($sentence);
-
-                    if ($sentenceLen <= $maxChars && $currentLength + $sentenceLen + 1 <= $maxChars) {
-                        $currentSubSegment .= ($currentSubSegment ? ' ' : '') . $sentence;
-                        $currentLength += ($currentSubSegment ? 1 : 0) + $sentenceLen;
-                    } else {
-                        if ($currentSubSegment) {
-                            $segments[] = $currentSubSegment;
+                } else {
+                    $currentSubSegment = '';
+                    foreach ($sentences as $sentence) {
+                        $sentence = trim($sentence);
+                        if ($sentence === '') {
+                            continue;
                         }
-                        $currentSubSegment = $sentence;
-                        $currentLength = $sentenceLen;
-                    }
-                }
 
-                if ($currentSubSegment) {
-                    $currentSegment = $currentSubSegment;
-                    $currentLength = mb_strlen($currentSubSegment);
+                        $sentenceLen = mb_strlen($sentence);
+
+                        if ($sentenceLen <= $maxChars && $currentLength + $sentenceLen + 1 <= $maxChars) {
+                            $currentSubSegment .= ($currentSubSegment ? ' ' : '') . $sentence;
+                            $currentLength += ($currentSubSegment ? 1 : 0) + $sentenceLen;
+                        } else {
+                            if ($currentSubSegment) {
+                                $segments[] = $currentSubSegment;
+                            }
+                            $currentSubSegment = $sentence;
+                            $currentLength = $sentenceLen;
+                        }
+                    }
+
+                    if ($currentSubSegment) {
+                        $currentSegment = $currentSubSegment;
+                        $currentLength = mb_strlen($currentSubSegment);
+                    }
                 }
             } else {
                 if ($currentSegment) {
@@ -104,5 +107,20 @@ class TextProcessor
     {
         $text = preg_replace('/\s+/', ' ', trim($text));
         return md5($text);
+    }
+
+    private static function chunkByLength(string $text, int $maxChars): array
+    {
+        $chunks = [];
+        $len = mb_strlen($text);
+        $offset = 0;
+
+        while ($offset < $len) {
+            $chunk = mb_substr($text, $offset, $maxChars);
+            $chunks[] = $chunk;
+            $offset += $maxChars;
+        }
+
+        return $chunks;
     }
 }

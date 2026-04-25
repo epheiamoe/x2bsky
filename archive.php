@@ -235,7 +235,13 @@ $paginationRange = range($paginationStart, $paginationEnd);
                                 </span>
                             </div>
                         </div>
-                        <p class="mt-2 text-slate-100 whitespace-pre-wrap break-all"><?= htmlspecialchars($post['text']) ?></p>
+                        <p class="mt-2 text-slate-100 whitespace-pre-wrap break-all"><?php
+                                if ($post['is_retweet'] && $post['original_author']) {
+                                    echo htmlspecialchars('RT @' . $post['original_author'] . ': ' . $post['text']);
+                                } else {
+                                    echo htmlspecialchars($post['text']);
+                                }
+                            ?></p>
                         <?php if (!empty($media['x'])): ?>
                         <div class="mt-3 grid grid-cols-2 gap-2">
                             <?php foreach ($media['x'] as $mediaIndex => $imgUrl): ?>
@@ -408,7 +414,15 @@ $paginationRange = range($paginationStart, $paginationEnd);
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({ id: id, type: 'master' })
                         });
-                        const data = await response.json();
+                        const contentType = response.headers.get('content-type') || '';
+                        let data;
+                        if (contentType.includes('application/json')) {
+                            data = await response.json();
+                        } else {
+                            const text = await response.text();
+                            alert('Server error: ' + text.substring(0, 100));
+                            return;
+                        }
 
                         if (data.success) {
                             location.reload();
@@ -432,7 +446,17 @@ $paginationRange = range($paginationStart, $paginationEnd);
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({ post_ids: [fetchedPostsId] })
                         });
-                        const data = await response.json();
+                        const contentType = response.headers.get('content-type') || '';
+                        let data;
+                        if (contentType.includes('application/json')) {
+                            data = await response.json();
+                        } else {
+                            const text = await response.text();
+                            alert('Server error: ' + text.substring(0, 100));
+                            btn.disabled = false;
+                            btn.textContent = 'Sync to BSKY';
+                            return;
+                        }
 
                         if (data.success || data.synced > 0) {
                             location.reload();
@@ -462,7 +486,17 @@ $paginationRange = range($paginationStart, $paginationEnd);
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({ url: url })
                         });
-                        const data = await response.json();
+                        const contentType = response.headers.get('content-type') || '';
+                        let data;
+                        if (contentType.includes('application/json')) {
+                            data = await response.json();
+                        } else {
+                            const text = await response.text();
+                            console.error('Media load error:', text.substring(0, 100));
+                            btn.disabled = false;
+                            btn.textContent = 'Load';
+                            return;
+                        }
 
                         if (data.success && data.data) {
                             this.loadedMedia[key] = 'data:' + data.mimeType + ';base64,' + data.data;

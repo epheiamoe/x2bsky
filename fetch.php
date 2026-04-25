@@ -251,7 +251,14 @@ $stats = $statsStmt->fetch();
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({ count: this.fetchCount })
                         });
-                        const data = await response.json();
+                        const contentType = response.headers.get('content-type') || '';
+                        let data;
+                        if (contentType.includes('application/json')) {
+                            data = await response.json();
+                        } else {
+                            const text = await response.text();
+                            throw new Error('Server returned non-JSON: ' + text.substring(0, 100));
+                        }
 
                         if (data.success) {
                             this.fetchSuccess = true;
@@ -282,7 +289,14 @@ $stats = $statsStmt->fetch();
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({ post_ids: this.selected })
                         });
-                        const data = await response.json();
+                        const contentType = response.headers.get('content-type') || '';
+                        let data;
+                        if (contentType.includes('application/json')) {
+                            data = await response.json();
+                        } else {
+                            const text = await response.text();
+                            throw new Error('Server returned non-JSON response: ' + text.substring(0, 200));
+                        }
 
                         if (data.results) {
                             let successCount = 0;
@@ -347,7 +361,15 @@ $stats = $statsStmt->fetch();
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({ id: id, type: 'fetched' })
                         });
-                        const data = await response.json();
+                        const contentType = response.headers.get('content-type') || '';
+                        let data;
+                        if (contentType.includes('application/json')) {
+                            data = await response.json();
+                        } else {
+                            const text = await response.text();
+                            alert('Server error: ' + text.substring(0, 100));
+                            return;
+                        }
 
                         if (data.success) {
                             this.posts = this.posts.filter(p => p.id !== id);

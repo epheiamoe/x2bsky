@@ -234,6 +234,14 @@ class XApiClient
                         break;
                     }
                 }
+            } else {
+                if (isset($tweet['attachments']['media_keys'])) {
+                    foreach ($tweet['attachments']['media_keys'] as $key) {
+                        if (isset($mediaMap[$key])) {
+                            $tweet['_media'][] = $mediaMap[$key];
+                        }
+                    }
+                }
             }
 
             if ($postType === 'quoted' && isset($tweet['entities']['urls'])) {
