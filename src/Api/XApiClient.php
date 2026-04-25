@@ -216,14 +216,6 @@ class XApiClient
             $tweet['_media'] = [];
             $tweet['_quoted_url'] = null;
 
-            if (isset($tweet['attachments']['media_keys'])) {
-                foreach ($tweet['attachments']['media_keys'] as $key) {
-                    if (isset($mediaMap[$key])) {
-                        $tweet['_media'][] = $mediaMap[$key];
-                    }
-                }
-            }
-
             if ($postType === 'retweeted' && isset($tweet['referenced_tweets'])) {
                 foreach ($tweet['referenced_tweets'] as $ref) {
                     if ($ref['type'] === 'retweeted' && isset($ref['id'])) {
@@ -242,12 +234,10 @@ class XApiClient
                         break;
                     }
                 }
-            } else {
-                if (isset($tweet['attachments']['media_keys'])) {
-                    foreach ($tweet['attachments']['media_keys'] as $key) {
-                        if (isset($mediaMap[$key])) {
-                            $tweet['_media'][] = $mediaMap[$key];
-                        }
+            } elseif (isset($tweet['attachments']['media_keys'])) {
+                foreach ($tweet['attachments']['media_keys'] as $key) {
+                    if (isset($mediaMap[$key])) {
+                        $tweet['_media'][] = $mediaMap[$key];
                     }
                 }
             }
