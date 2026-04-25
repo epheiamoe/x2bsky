@@ -8,6 +8,9 @@ class TextProcessor
 {
     public static function splitForBluesky(string $text, int $maxChars = 300): array
     {
+        $reservedSpace = 10;
+        $effectiveMax = max(50, $maxChars - $reservedSpace);
+
         $segments = [];
         $paragraphs = preg_split('/\n\n+/', $text);
 
@@ -26,10 +29,10 @@ class TextProcessor
 
             $paraLength = mb_strlen($paragraph);
 
-            if ($paraLength <= $maxChars && $currentLength + $paraLength + 2 <= $maxChars) {
+            if ($paraLength <= $effectiveMax && $currentLength + $paraLength + 2 <= $effectiveMax) {
                 $currentSegment .= ($currentSegment ? "\n\n" : '') . $paragraph;
                 $currentLength += ($currentSegment ? 2 : 0) + $paraLength;
-            } elseif ($paraLength > $maxChars) {
+            } elseif ($paraLength > $effectiveMax) {
                 if ($currentSegment) {
                     $segments[] = $currentSegment;
                     $currentSegment = '';
@@ -38,7 +41,7 @@ class TextProcessor
 
                 $sentences = preg_split('/(?<=[.!?。！？])\s+/', $paragraph);
                 if ($sentences === false || count($sentences) <= 1) {
-                    $chunks = self::chunkByLength($paragraph, $maxChars);
+                    $chunks = self::chunkByLength($paragraph, $effectiveMax);
                     foreach ($chunks as $chunk) {
                         $segments[] = $chunk;
                     }
@@ -52,7 +55,7 @@ class TextProcessor
 
                         $sentenceLen = mb_strlen($sentence);
 
-                        if ($sentenceLen <= $maxChars && $currentLength + $sentenceLen + 1 <= $maxChars) {
+                        if ($sentenceLen <= $effectiveMax && $currentLength + $sentenceLen + 1 <= $effectiveMax) {
                             $currentSubSegment .= ($currentSubSegment ? ' ' : '') . $sentence;
                             $currentLength += ($currentSubSegment ? 1 : 0) + $sentenceLen;
                         } else {
