@@ -24,10 +24,13 @@ $totalPosts = (int) $stmt->fetchColumn();
 $stmt = $pdo->prepare('
     SELECT p.*,
            GROUP_CONCAT(DISTINCT CONCAT(sd.platform, ":", sd.platform_post_url) SEPARATOR "|") as destinations,
-           GROUP_CONCAT(DISTINCT CONCAT(pm.platform, ":", pm.original_url) SEPARATOR "|") as media
+           GROUP_CONCAT(DISTINCT CONCAT(pm.platform, ":", pm.original_url) SEPARATOR "|") as media,
+           fp.id as fetched_posts_id,
+           fp.synced as fetched_synced
     FROM posts p
-    LEFT JOIN synced_destinations sd ON p.id = sd.post_id
+    LEFT JOIN synced_destinations sd ON p.id = sd.post_id AND sd.platform = \'bluesky\'
     LEFT JOIN post_media pm ON p.id = pm.post_id
+    LEFT JOIN fetched_posts fp ON p.x_post_id = fp.x_post_id
     GROUP BY p.id
     ORDER BY p.x_created_at DESC
     LIMIT :limit OFFSET :offset
@@ -166,6 +169,8 @@ $paginationRange = range($paginationStart, $paginationEnd);
                                 <td class="px-4 py-4 whitespace-nowrap text-sm">
                                     <?php if (!empty($destinations['bluesky'])): ?>
                                     <a href="<?= htmlspecialchars($destinations['bluesky']) ?>" target="_blank" class="text-indigo-400 hover:text-indigo-300">BSKY</a>
+                                    <?php elseif (!empty($post['fetched_posts_id']) && (int)$post['fetched_synced'] === 0): ?>
+                                    <button @click="resyncPost(<?= (int)$post['fetched_posts_id'] ?>)" class="text-green-400 hover:text-green-300">Sync</button>
                                     <?php else: ?>
                                     <span class="text-slate-500">-</span>
                                     <?php endif; ?>
@@ -272,6 +277,13 @@ $paginationRange = range($paginationStart, $paginationEnd);
                                     </svg>
                                     BSKY
                                 </a>
+                                <?php elseif (!empty($post['fetched_posts_id']) && (int)$post['fetched_synced'] === 0): ?>
+                                <button @click="resyncPost(<?= (int)$post['fetched_posts_id'] ?>)" class="text-green-400 hover:text-green-300 text-sm flex items-center font-medium">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                    </svg>
+                                    Sync to BSKY
+                                </button>
                                 <?php endif; ?>
                             </div>
                             <div class="flex items-center space-x-3">
@@ -405,6 +417,34 @@ $paginationRange = range($paginationStart, $paginationEnd);
                         }
                     } catch (err) {
                         alert('Delete failed: ' + err.message);
+                    }
+                },
+
+                async resyncPost(fetchedPostsId) {
+                    if (!confirm('Sync this post to Bluesky?')) return;
+                    const btn = event.target.closest('button');
+                    btn.disabled = true;
+                    btn.textContent = 'Syncing...';
+
+                    try {
+                        const response = await fetch('api/sync.php', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ post_ids: [fetchedPostsId] })
+                        });
+                        const data = await response.json();
+
+                        if (data.success || data.synced > 0) {
+                            location.reload();
+                        } else {
+                            alert(data.error || 'Sync failed');
+                            btn.disabled = false;
+                            btn.textContent = 'Sync to BSKY';
+                        }
+                    } catch (err) {
+                        alert('Sync failed: ' + err.message);
+                        btn.disabled = false;
+                        btn.textContent = 'Sync to BSKY';
                     }
                 },
 

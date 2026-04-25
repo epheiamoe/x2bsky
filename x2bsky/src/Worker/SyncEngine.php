@@ -39,7 +39,7 @@ class SyncEngine
         $tweets = $this->xClient->getUserTweets($count, $lastSinceId);
 
         if (empty($tweets)) {
-            $stmt = $pdo->prepare('UPDATE sync_jobs SET status = "completed", completed_at = datetime("now"), error_message = "No new tweets" WHERE job_id = ?');
+            $stmt = $pdo->prepare('UPDATE sync_jobs SET status = "completed", completed_at = NOW(), error_message = "No new tweets" WHERE job_id = ?');
             $stmt->execute([$jobId]);
             Logger::info('No new tweets to sync', ['job_id' => $jobId]);
             return ['job_id' => $jobId, 'status' => 'completed', 'processed' => 0];
@@ -48,7 +48,7 @@ class SyncEngine
         $filtered = $this->filterNewTweets($tweets);
 
         if (empty($filtered)) {
-            $stmt = $pdo->prepare('UPDATE sync_jobs SET status = "completed", completed_at = datetime("now"), error_message = "All tweets already synced" WHERE job_id = ?');
+            $stmt = $pdo->prepare('UPDATE sync_jobs SET status = "completed", completed_at = NOW(), error_message = "All tweets already synced" WHERE job_id = ?');
             $stmt->execute([$jobId]);
             Logger::info('All tweets already synced', ['job_id' => $jobId]);
             return ['job_id' => $jobId, 'status' => 'completed', 'processed' => 0];
@@ -154,7 +154,7 @@ class SyncEngine
 
             if (!empty($results)) {
                 $pdo = Database::getInstance();
-                $stmt = $pdo->prepare('UPDATE synced_posts SET status = "synced", synced_at = datetime("now") WHERE x_post_id = ?');
+                $stmt = $pdo->prepare('UPDATE synced_posts SET status = "synced", synced_at = NOW() WHERE x_post_id = ?');
                 $stmt->execute([$xPostId]);
 
                 Logger::info('Post synced successfully', ['x_post_id' => $xPostId, 'bsky_posts' => count($results)]);
@@ -304,7 +304,7 @@ class SyncEngine
     public function completeJob(string $jobId): void
     {
         $pdo = Database::getInstance();
-        $stmt = $pdo->prepare('UPDATE sync_jobs SET status = "completed", completed_at = datetime("now") WHERE job_id = ?');
+        $stmt = $pdo->prepare('UPDATE sync_jobs SET status = "completed", completed_at = NOW() WHERE job_id = ?');
         $stmt->execute([$jobId]);
     }
 }

@@ -88,10 +88,6 @@ class MediaProcessor
 
     private static function getMimeType(string $path): string
     {
-        if (function_exists('mime_content_type')) {
-            return mime_content_type($path);
-        }
-
         $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
         $mimeTypes = [
             'jpg' => 'image/jpeg',

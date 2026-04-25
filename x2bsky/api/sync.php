@@ -39,9 +39,11 @@ if (empty($postIds)) {
 try {
     $pdo = Database::getInstance();
     $bsky = new BlueskyClient();
+    Settings::initDefaults();
+    $threadMediaPosition = Settings::get('thread_media_position', 'last');
 
     if (!$bsky->authenticate()) {
-        throw new \Exception('Bluesky authentication failed');
+        throw new \Exception('Bluesky authentication failed - please check your credentials in .env');
     }
 
     $synced = 0;
@@ -62,13 +64,17 @@ try {
         $text = $post['text'];
         $isQuote = (bool)$post['is_quote'];
         $isRetweet = (bool)$post['is_retweet'];
+        $quotedUrl = $post['quoted_url'] ?? null;
 
-        if ($isQuote) {
-            $text .= ' ' . $post['x_post_url'];
+        if ($isQuote && $quotedUrl) {
+            $text .= "\n\n引用 " . $quotedUrl;
         }
 
         if ($isRetweet && $post['original_author']) {
             $text = 'RT @' . $post['original_author'] . ': ' . $text;
+            if ($quotedUrl) {
+                $text .= "\n\n原推文 " . $quotedUrl;
+            }
         }
 
         $mediaJson = $post['media_json'];
@@ -113,10 +119,18 @@ try {
         $parentUri = null;
         $rootUri = null;
         $postUris = [];
+        $segmentErrors = [];
+        $totalSegments = count($segments);
 
         foreach ($segments as $i => $segment) {
             $embed = null;
-            if ($i === 0 && !empty($blobs)) {
+
+            $shouldAttachMedia = !empty($blobs) && (
+                ($threadMediaPosition === 'first' && $i === 0) ||
+                ($threadMediaPosition === 'last' && $i === $totalSegments - 1)
+            );
+
+            if ($shouldAttachMedia) {
                 $images = [];
                 foreach ($blobs as $j => $blob) {
                     $images[] = [
@@ -135,7 +149,10 @@ try {
                 $replyRef = ['parent' => $parentUri, 'root' => $rootUri];
             }
 
-            $result = $bsky->createPost($segment['text'], $embed, $replyRef ? json_encode($replyRef) : null);
+            $progressNote = $totalSegments > 1 ? sprintf(' [%d/%d]', $i + 1, $totalSegments) : '';
+            $segmentText = $segment['text'] . $progressNote;
+
+            $result = $bsky->createPost($segmentText, $embed, $replyRef ? json_encode($replyRef) : null);
 
             if ($result && isset($result['uri'])) {
                 $uri = $result['uri'];
@@ -144,6 +161,8 @@ try {
                 }
                 $parentUri = $uri;
                 $postUris[] = $uri;
+            } else {
+                $segmentErrors[] = sprintf('Segment %d/%d failed: %s', $i + 1, $totalSegments, $bsky->getLastError() ?? 'Unknown error');
             }
         }
 
@@ -152,24 +171,59 @@ try {
 
             $stmt = $pdo->prepare('
                 UPDATE fetched_posts
-                SET synced = 1, synced_at = datetime("now"), synced_bsky_uri = ?
+                SET synced = 1, synced_at = NOW(), synced_bsky_uri = ?
                 WHERE id = ?
             ');
             $stmt->execute([$finalUri, $postId]);
 
-            $synced++;
-            $results[] = ['id' => $postId, 'status' => 'success', 'uri' => $finalUri];
+            $stmt = $pdo->prepare('SELECT id FROM posts WHERE x_post_id = ?');
+            $stmt->execute([$post['x_post_id']]);
+            $postRow = $stmt->fetch();
+            $masterPostId = $postRow ? $postRow['id'] : null;
 
-            Logger::info('Synced to Bluesky', ['id' => $postId, 'uri' => $finalUri]);
+            if ($masterPostId) {
+                $stmt = $pdo->prepare('
+                    INSERT INTO synced_destinations (post_id, platform, platform_post_url, platform_post_uri, status, synced_at)
+                    VALUES (?, ?, ?, ?, ?, NOW())
+                ');
+                $bskyHandle = Config::get('BSKY_HANDLE', 'your_handle');
+                $platformUrl = 'https://bsky.app/profile/' . $bskyHandle . '/post/' . basename($finalUri);
+                $stmt->execute([$masterPostId, 'bluesky', $platformUrl, $finalUri, 'synced']);
+
+                foreach ($blobs as $blob) {
+                    $stmt = $pdo->prepare('
+                        INSERT INTO post_media (post_id, platform, media_type, original_url, local_path, alt_text)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ');
+                    $stmt->execute([
+                        $masterPostId,
+                        'bluesky',
+                        'image',
+                        $platformUrl,
+                        null,
+                        $altTexts[$j] ?? ''
+                    ]);
+                }
+            }
+
+            $synced++;
+            $resultData = ['id' => $postId, 'status' => 'success', 'uri' => $finalUri, 'segments' => $totalSegments, 'thread_position' => $threadMediaPosition];
+            if (!empty($segmentErrors)) {
+                $resultData['segment_errors'] = $segmentErrors;
+            }
+            $results[] = $resultData;
+
+            Logger::info('Synced to Bluesky', ['id' => $postId, 'uri' => $finalUri, 'segments' => $totalSegments]);
         } else {
             $failed++;
-            $results[] = ['id' => $postId, 'status' => 'failed'];
-            Logger::error('Failed to sync', ['id' => $postId]);
+            $errorMsg = !empty($segmentErrors) ? implode('; ', $segmentErrors) : 'Failed to create thread';
+            $results[] = ['id' => $postId, 'status' => 'failed', 'error' => $errorMsg];
+            Logger::error('Failed to sync', ['id' => $postId, 'errors' => $segmentErrors]);
         }
     }
 
     echo json_encode([
-        'success' => true,
+        'success' => $failed === 0,
         'synced' => $synced,
         'failed' => $failed,
         'results' => $results

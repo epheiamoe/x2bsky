@@ -41,6 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $syncIncludeRts = isset($_POST['sync_include_rts']);
         $syncIncludeQuotes = isset($_POST['sync_include_quotes']);
         $fetchDefaultCount = max(5, min(100, (int)($_POST['fetch_default_count'] ?? 20)));
+        $threadMediaPosition = in_array($_POST['thread_media_position'] ?? 'last', ['first', 'last']) ? $_POST['thread_media_position'] : 'last';
+        $historyPerPage = max(5, min(50, (int)($_POST['history_per_page'] ?? 20)));
+        $historyMaxPages = max(1, min(100, (int)($_POST['history_max_pages'] ?? 10)));
 
         Settings::set('cron_enabled', $cronEnabled);
         Settings::set('cron_interval', $cronInterval);
@@ -48,6 +51,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         Settings::set('sync_include_rts', $syncIncludeRts);
         Settings::set('sync_include_quotes', $syncIncludeQuotes);
         Settings::set('fetch_default_count', $fetchDefaultCount);
+        Settings::set('thread_media_position', $threadMediaPosition);
+        Settings::set('history_per_page', $historyPerPage);
+        Settings::set('history_max_pages', $historyMaxPages);
 
         $success = 'Sync settings saved successfully';
         $activeTab = 'sync';
@@ -60,6 +66,9 @@ $syncCount = Settings::get('sync_count', 10);
 $syncIncludeRts = Settings::get('sync_include_rts', false);
 $syncIncludeQuotes = Settings::get('sync_include_quotes', true);
 $fetchDefaultCount = Settings::get('fetch_default_count', 20);
+$threadMediaPosition = Settings::get('thread_media_position', 'last');
+$historyPerPage = Settings::get('history_per_page', 20);
+$historyMaxPages = Settings::get('history_max_pages', 10);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -75,9 +84,9 @@ $fetchDefaultCount = Settings::get('fetch_default_count', 20);
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-8">
                     <a href="index.php" class="text-xl font-bold text-white">x2bsky</a>
-                    <div class="hidden md:flex space-x-6">
+                    <div class="flex space-x-6">
                         <a href="index.php" class="text-slate-400 hover:text-white transition">Dashboard</a>
-                        <a href="history.php" class="text-slate-400 hover:text-white transition">History</a>
+                        <a href="archive.php" class="text-slate-400 hover:text-white transition">Archive</a>
                         <a href="settings.php" class="text-white font-medium">Settings</a>
                     </div>
                 </div>
@@ -182,6 +191,19 @@ $fetchDefaultCount = Settings::get('fetch_default_count', 20);
                 </div>
 
                 <div>
+                    <label for="thread_media_position" class="block text-sm font-medium text-slate-300 mb-2">Thread Media Position</label>
+                    <select
+                        id="thread_media_position"
+                        name="thread_media_position"
+                        class="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="last" <?= $threadMediaPosition === 'last' ? 'selected' : '' ?>>Last post in thread</option>
+                        <option value="first" <?= $threadMediaPosition === 'first' ? 'selected' : '' ?>>First post in thread</option>
+                    </select>
+                    <p class="text-xs text-slate-500 mt-1">Where to attach images in multi-post threads</p>
+                </div>
+
+                <div>
                     <label for="fetch_default_count" class="block text-sm font-medium text-slate-300 mb-2">Fetch Count</label>
                     <input
                         type="number"
@@ -193,6 +215,34 @@ $fetchDefaultCount = Settings::get('fetch_default_count', 20);
                         class="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                     <p class="text-xs text-slate-500 mt-1">Posts to fetch per fetch operation (5-100, cost ~$0.002 per post)</p>
+                </div>
+
+                <div>
+                    <label for="history_per_page" class="block text-sm font-medium text-slate-300 mb-2">History Per Page</label>
+                    <input
+                        type="number"
+                        id="history_per_page"
+                        name="history_per_page"
+                        value="<?= (int)$historyPerPage ?>"
+                        min="5"
+                        max="50"
+                        class="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                    <p class="text-xs text-slate-500 mt-1">Posts per page in History/Archive (5-50)</p>
+                </div>
+
+                <div>
+                    <label for="history_max_pages" class="block text-sm font-medium text-slate-300 mb-2">Max Pagination Pages</label>
+                    <input
+                        type="number"
+                        id="history_max_pages"
+                        name="history_max_pages"
+                        value="<?= (int)$historyMaxPages ?>"
+                        min="1"
+                        max="100"
+                        class="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                    <p class="text-xs text-slate-500 mt-1">Maximum pages to show in pagination (1-100)</p>
                 </div>
 
                 <button

@@ -16,7 +16,7 @@ class Settings
 
         try {
             $pdo = Database::getInstance();
-            $stmt = $pdo->prepare('SELECT value FROM settings WHERE key = ?');
+            $stmt = $pdo->prepare('SELECT value FROM settings WHERE setting_key = ?');
             $stmt->execute([$key]);
             $row = $stmt->fetch();
 
@@ -37,12 +37,21 @@ class Settings
         try {
             $pdo = Database::getInstance();
             $jsonValue = json_encode($value);
+            $type = Config::get('DB_TYPE', 'mysql');
 
-            $stmt = $pdo->prepare('
-                INSERT INTO settings (key, value, updated_at)
-                VALUES (?, ?, datetime("now"))
-                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-            ');
+            if ($type === 'mysql') {
+                $stmt = $pdo->prepare('
+                    INSERT INTO settings (setting_key, value, updated_at)
+                    VALUES (?, ?, NOW())
+                    ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW()
+                ');
+            } else {
+                $stmt = $pdo->prepare('
+                    INSERT INTO settings (setting_key, value, updated_at)
+                    VALUES (?, ?, NOW())
+                    ON CONFLICT(setting_key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+                ');
+            }
             $stmt->execute([$key, $jsonValue]);
 
             self::$cache[$key] = $value;
@@ -57,12 +66,12 @@ class Settings
     {
         try {
             $pdo = Database::getInstance();
-            $stmt = $pdo->query('SELECT key, value FROM settings');
+            $stmt = $pdo->query('SELECT setting_key, value FROM settings');
             $rows = $stmt->fetchAll();
 
             $settings = [];
             foreach ($rows as $row) {
-                $settings[$row['key']] = json_decode($row['value'], true) ?? $row['value'];
+                $settings[$row['setting_key']] = json_decode($row['value'], true) ?? $row['value'];
             }
 
             return $settings;
@@ -75,7 +84,7 @@ class Settings
     {
         try {
             $pdo = Database::getInstance();
-            $stmt = $pdo->prepare('DELETE FROM settings WHERE key = ?');
+            $stmt = $pdo->prepare('DELETE FROM settings WHERE setting_key = ?');
             $stmt->execute([$key]);
 
             unset(self::$cache[$key]);

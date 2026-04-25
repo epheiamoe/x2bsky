@@ -69,7 +69,7 @@ class XApiClient
         $params = [
             'max_results' => min(max($maxResults, 5), 100),
             'tweet.fields' => 'id,text,created_at,entities,attachments,possibly_sensitive,referenced_tweets,edit_history_tweet_ids',
-            'expansions' => 'attachments.media_keys',
+            'expansions' => 'attachments.media_keys,referenced_tweets.id',
             'media.fields' => 'url,preview_image_url,type,duration_ms,width,height,alt_text,media_key',
         ];
 
@@ -143,7 +143,7 @@ class XApiClient
         $params = [
             'max_results' => min(max($maxResults, 5), 100),
             'tweet.fields' => 'id,text,created_at,entities,attachments,possibly_sensitive,referenced_tweets,edit_history_tweet_ids,author_id',
-            'expansions' => 'attachments.media_keys',
+            'expansions' => 'attachments.media_keys,referenced_tweets.id',
             'media.fields' => 'url,preview_image_url,type,duration_ms,width,height,alt_text,media_key',
         ];
 
@@ -188,10 +188,16 @@ class XApiClient
         $tweets = $data['data'] ?? [];
         $includes = $data['includes'] ?? [];
         $medias = $includes['media'] ?? [];
+        $includesTweets = $includes['tweets'] ?? [];
 
         $mediaMap = [];
         foreach ($medias as $media) {
             $mediaMap[$media['media_key']] = $media;
+        }
+
+        $tweetMap = [];
+        foreach ($includesTweets as $t) {
+            $tweetMap[$t['id']] = $t;
         }
 
         $filteredTweets = [];
@@ -204,11 +210,37 @@ class XApiClient
 
             $tweet['_post_type'] = $postType;
             $tweet['_media'] = [];
+            $tweet['_quoted_url'] = null;
 
             if (isset($tweet['attachments']['media_keys'])) {
                 foreach ($tweet['attachments']['media_keys'] as $key) {
                     if (isset($mediaMap[$key])) {
                         $tweet['_media'][] = $mediaMap[$key];
+                    }
+                }
+            }
+
+            if ($postType === 'retweeted' && isset($tweet['referenced_tweets'])) {
+                foreach ($tweet['referenced_tweets'] as $ref) {
+                    if ($ref['type'] === 'retweeted' && isset($ref['id']) && isset($tweetMap[$ref['id']])) {
+                        $originalTweet = $tweetMap[$ref['id']];
+                        if (isset($originalTweet['attachments']['media_keys'])) {
+                            foreach ($originalTweet['attachments']['media_keys'] as $key) {
+                                if (isset($mediaMap[$key])) {
+                                    $tweet['_media'][] = $mediaMap[$key];
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if ($postType === 'quoted' && isset($tweet['entities']['urls'])) {
+                foreach ($tweet['entities']['urls'] as $url) {
+                    if (!empty($url['expanded_url']) && strpos($url['expanded_url'], '/status/') !== false) {
+                        $tweet['_quoted_url'] = $url['expanded_url'];
+                        break;
                     }
                 }
             }

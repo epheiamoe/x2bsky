@@ -11,6 +11,8 @@ Config::init(__DIR__ . '/.env');
 Auth::requireAuth();
 Settings::initDefaults();
 
+$bskyHandle = Config::get('BSKY_HANDLE', 'your_handle');
+
 $pdo = Database::getInstance();
 
 $stmt = $pdo->query('
@@ -68,10 +70,10 @@ $stats = $statsStmt->fetch();
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-8">
                     <a href="index.php" class="text-xl font-bold text-white">x2bsky</a>
-                    <div class="hidden md:flex space-x-6">
+                    <div class="flex space-x-6">
                         <a href="index.php" class="text-white font-medium">Dashboard</a>
                         <a href="fetch.php" class="text-slate-400 hover:text-white transition">Fetch</a>
-                        <a href="history.php" class="text-slate-400 hover:text-white transition">History</a>
+                        <a href="archive.php" class="text-slate-400 hover:text-white transition">Archive</a>
                         <a href="settings.php" class="text-slate-400 hover:text-white transition">Settings</a>
                     </div>
                 </div>
@@ -91,6 +93,7 @@ $stats = $statsStmt->fetch();
                     <span x-show="!fetching">Fetch Posts</span>
                     <span x-show="fetching">Fetching...</span>
                 </button>
+                <input type="number" x-model="fetchCount" min="5" max="100" value="20" class="w-20 px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500">
             </div>
         </div>
 
@@ -140,6 +143,7 @@ $stats = $statsStmt->fetch();
                         <th class="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Post</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Date</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Media</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-700">
@@ -183,6 +187,10 @@ $stats = $statsStmt->fetch();
                             <span class="text-slate-500 text-sm">No</span>
                             <?php endif; ?>
                         </td>
+                        <td class="px-4 py-3">
+                            <a href="post.php?id=<?= (int)$post['id'] ?>&from=fetch" class="text-blue-400 hover:text-blue-300 text-sm">View</a>
+                            <button @click="confirmDelete(<?= (int)$post['id'] ?>)" class="ml-3 text-red-400 hover:text-red-300 text-sm">Delete</button>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -198,9 +206,14 @@ $stats = $statsStmt->fetch();
             <h3 class="text-lg font-semibold text-white mb-4">Sync Results</h3>
             <div class="space-y-2">
                 <template x-for="result in syncResults" :key="result.id">
-                    <div class="flex items-center justify-between py-2 border-b border-slate-700 last:border-0">
-                        <span class="text-sm text-slate-300" x-text="'Post #' + result.id"></span>
-                        <span :class="result.status === 'success' ? 'text-green-400' : 'text-red-400'" x-text="result.status === 'success' ? 'Success' : 'Failed'"></span>
+                    <div class="py-2 border-b border-slate-700 last:border-0">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-slate-300" x-text="'Post #' + result.id"></span>
+                            <span :class="result.status === 'success' ? 'text-green-400' : 'text-red-400'" x-text="result.message || (result.status === 'success' ? 'Success' : 'Failed')"></span>
+                        </div>
+                        <div x-show="result.uri" class="mt-1">
+                            <a :href="'https://bsky.app/profile/<?= htmlspecialchars($bskyHandle) ?>/post/' + result.uri.split('/').pop()" target="_blank" class="text-xs text-blue-400 hover:text-blue-300">View on Bluesky →</a>
+                        </div>
                     </div>
                 </template>
             </div>
@@ -219,6 +232,7 @@ $stats = $statsStmt->fetch();
                     'has_media' => !empty($p['media_json'])
                 ], $filteredPosts)) ?>,
                 selected: [],
+                fetchCount: 20,
                 fetching: false,
                 syncing: false,
                 fetchMessage: '',
@@ -235,7 +249,7 @@ $stats = $statsStmt->fetch();
                         const response = await fetch('api/fetch.php', {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({ count: 20 })
+                            body: JSON.stringify({ count: this.fetchCount })
                         });
                         const data = await response.json();
 
@@ -259,7 +273,8 @@ $stats = $statsStmt->fetch();
                     if (this.selected.length === 0) return;
 
                     this.syncing = true;
-                    this.syncMessage = '';
+                    this.syncMessage = 'Starting sync...';
+                    this.syncResults = [];
 
                     try {
                         const response = await fetch('api/sync.php', {
@@ -269,12 +284,29 @@ $stats = $statsStmt->fetch();
                         });
                         const data = await response.json();
 
-                        if (data.success) {
-                            this.syncSuccess = true;
-                            this.syncMessage = `Synced ${data.synced} posts, ${data.failed} failed.`;
-                            this.syncResults = data.results || [];
+                        if (data.results) {
+                            let successCount = 0;
+                            let failCount = 0;
+                            this.syncResults = data.results.map(r => {
+                                if (r.status === 'success') {
+                                    successCount++;
+                                    let msg = `Success`;
+                                    if (r.segments && r.segments > 1) {
+                                        msg += ` (${r.segments} segments, media: ${r.thread_position})`;
+                                    }
+                                    if (r.segment_errors && r.segment_errors.length > 0) {
+                                        msg += ` [${r.segment_errors.length} errors]`;
+                                    }
+                                    return { id: r.id, status: 'success', message: msg, uri: r.uri };
+                                } else {
+                                    failCount++;
+                                    return { id: r.id, status: 'failed', message: r.error || 'Unknown error' };
+                                }
+                            });
+                            this.syncSuccess = failCount === 0;
+                            this.syncMessage = `Synced ${successCount} posts, ${failCount} failed.`;
                             this.selected = [];
-                            setTimeout(() => location.reload(), 2000);
+                            setTimeout(() => location.reload(), 3000);
                         } else {
                             this.syncSuccess = false;
                             this.syncMessage = data.error || 'Sync failed';
@@ -300,6 +332,31 @@ $stats = $statsStmt->fetch();
                         this.selectAll();
                     } else {
                         this.deselectAll();
+                    }
+                },
+
+                confirmDelete(id) {
+                    if (!confirm('Delete this post? This cannot be undone.')) return;
+                    this.deletePost(id);
+                },
+
+                async deletePost(id) {
+                    try {
+                        const response = await fetch('api/delete_post.php', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ id: id, type: 'fetched' })
+                        });
+                        const data = await response.json();
+
+                        if (data.success) {
+                            this.posts = this.posts.filter(p => p.id !== id);
+                            this.selected = this.selected.filter(i => i !== id);
+                        } else {
+                            alert(data.error || 'Delete failed');
+                        }
+                    } catch (err) {
+                        alert('Delete failed: ' + err.message);
                     }
                 }
             }

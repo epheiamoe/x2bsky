@@ -14,12 +14,14 @@ class BlueskyClient
     private ?string $accessToken = null;
     private ?string $did = null;
     private string $sessionFile;
+    private ?string $lastError = null;
 
     public function __construct()
     {
         $this->handle = Config::get('BSKY_HANDLE', '');
         $this->password = Config::get('BSKY_APP_PASSWORD', Config::get('BSKY_PASSWORD', ''));
-        $this->sessionFile = dirname(__DIR__, 2) . '/data/bsky_session.json';
+        $sessionDir = Config::get('BSKY_SESSION_DIR', dirname(__DIR__, 2) . '/data');
+        $this->sessionFile = rtrim($sessionDir, '/') . '/bsky_session.json';
     }
 
     public function authenticate(): bool
@@ -150,7 +152,31 @@ class BlueskyClient
             'result' => $result
         ]);
 
+        $this->lastError = $result['message'] ?? $result['error'] ?? 'API call failed';
         return null;
+    }
+
+    public function getLastError(): ?string
+    {
+        return $this->lastError;
+    }
+
+    private function getMimeType(string $path): string
+    {
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $mimeTypes = [
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'mp4' => 'video/mp4',
+            'mov' => 'video/quicktime',
+            'avi' => 'video/x-msvideo',
+            'webm' => 'video/webm',
+        ];
+
+        return $mimeTypes[$ext] ?? 'application/octet-stream';
     }
 
     public function uploadBlob(string $filePath): ?array
@@ -159,31 +185,22 @@ class BlueskyClient
             return null;
         }
 
-        $mimeType = mime_content_type($filePath);
+        $mimeType = $this->getMimeType($filePath);
         $fileData = file_get_contents($filePath);
-        $base64Data = base64_encode($fileData);
 
         $url = 'https://bsky.social/xrpc/com.atproto.repo.uploadBlob';
 
-        $boundary = 'x2bsky_' . bin2hex(random_bytes(8));
-
-        $body = "--{$boundary}\r\n";
-        $body .= "Content-Type: {$mimeType}\r\n";
-        $body .= "Content-Disposition: form-data; name=\"file\"; filename=\"" . basename($filePath) . "\"\r\n\r\n";
-        $body .= $fileData . "\r\n";
-        $body .= "--{$boundary}--\r\n";
-
         $headers = [
             'Authorization: Bearer ' . $this->accessToken,
-            'Content-Type: multipart/form-data; boundary=' . $boundary,
-            'Content-Length: ' . strlen($body),
+            'Content-Type: ' . $mimeType,
+            'Content-Length: ' . strlen($fileData),
         ];
 
         $context = stream_context_create([
             'http' => [
                 'method' => 'POST',
                 'header' => implode("\r\n", $headers),
-                'content' => $body,
+                'content' => $fileData,
                 'ignore_errors' => true,
             ]
         ]);
@@ -204,7 +221,7 @@ class BlueskyClient
         $record = [
             '$type' => 'app.bsky.feed.post',
             'text' => $text,
-            'createdAt' => date('c'),
+            'createdAt' => gmdate('Y-m-d\TH:i:s.v\Z'),
         ];
 
         if ($embed) {

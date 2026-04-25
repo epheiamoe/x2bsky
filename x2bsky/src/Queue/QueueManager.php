@@ -72,7 +72,7 @@ class QueueManager
             $pdo = Database::getInstance();
             $stmt = $pdo->prepare('
                 INSERT INTO queue (job_id, x_post_id, post_data, priority, process_after)
-                VALUES (?, ?, ?, ?, datetime("now"))
+                VALUES (?, ?, ?, ?, NOW())
             ');
             $stmt->execute([$jobId, $xPostId, json_encode($postData), $priority]);
             return true;
@@ -126,7 +126,7 @@ class QueueManager
             $stmt = $pdo->prepare('
                 SELECT * FROM queue
                 WHERE status = "pending"
-                AND process_after <= datetime("now")
+                AND process_after <= NOW()
                 AND attempts < max_attempts
                 ORDER BY priority DESC, created_at ASC
                 LIMIT 1
@@ -156,7 +156,7 @@ class QueueManager
 
         try {
             $pdo = Database::getInstance();
-            $stmt = $pdo->prepare('UPDATE queue SET status = "complete", processed_at = datetime("now") WHERE id = ?');
+            $stmt = $pdo->prepare('UPDATE queue SET status = "complete", processed_at = NOW() WHERE id = ?');
             $stmt->execute([$queueId]);
         } catch (\Throwable $e) {
             Logger::error('Failed to mark queue item complete', ['id' => $queueId]);
@@ -175,7 +175,7 @@ class QueueManager
                 UPDATE queue
                 SET status = "failed", error_message = ?,
                     attempts = attempts + 1,
-                    process_after = datetime("now", "+" || (POWER(2, attempts) * 60) || " seconds")
+                    process_after = DATE_ADD(NOW(), INTERVAL (POW(2, attempts) * 60) SECOND)
                 WHERE id = ?
             ');
             $stmt->execute([$error, $queueId]);

@@ -1,6 +1,15 @@
+# Environment
 .env
 .env.backup
+.env.vps
+.env.prod
+*.pem
+*.key
+
+# Dependencies
 /vendor/
+
+# Data & Logs
 /data/*.db
 /data/*.db-journal
 /data/.remember_token
@@ -8,5 +17,13 @@
 /logs/
 /var/log/
 *.log
+
+# Test & Debug files
+test_*.php
+check_*.php
+*_test.php
+debug*.php
+
+# OS files
 .DS_Store
 Thumbs.db

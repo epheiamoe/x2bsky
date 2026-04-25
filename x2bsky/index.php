@@ -43,10 +43,10 @@ $cronInterval = Settings::get('cron_interval', 5);
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-8">
                     <h1 class="text-xl font-bold text-white">x2bsky</h1>
-                    <div class="hidden md:flex space-x-6">
+                    <div class="flex space-x-6">
                         <a href="index.php" class="text-white font-medium">Dashboard</a>
                         <a href="fetch.php" class="text-slate-400 hover:text-white transition">Fetch & Sync</a>
-                        <a href="history.php" class="text-slate-400 hover:text-white transition">History</a>
+                        <a href="archive.php" class="text-slate-400 hover:text-white transition">Archive</a>
                         <a href="settings.php" class="text-slate-400 hover:text-white transition">Settings</a>
                     </div>
                 </div>
