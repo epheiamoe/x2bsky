@@ -31,7 +31,14 @@ $count = max(5, min(100, (int)($input['count'] ?? Settings::get('fetch_default_c
 
 try {
     $xClient = new XApiClient();
-    $tweets = $xClient->fetchUserTweets($count);
+
+    $syncIncludeRts = (bool)Settings::get('sync_include_rts', false);
+    $exclude = ['replies'];
+    if (!$syncIncludeRts) {
+        $exclude[] = 'retweets';
+    }
+
+    $tweets = $xClient->fetchUserTweets($count, null, $exclude);
 
     if (empty($tweets)) {
         echo json_encode([

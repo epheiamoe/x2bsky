@@ -136,7 +136,7 @@ class XApiClient
         return $tweets;
     }
 
-    public function fetchUserTweets(int $maxResults = 20, ?string $sinceId = null): array
+    public function fetchUserTweets(int $maxResults = 20, ?string $sinceId = null, array $exclude = []): array
     {
         $url = "https://api.twitter.com/2/users/{$this->userId}/tweets";
 
@@ -149,6 +149,10 @@ class XApiClient
 
         if ($sinceId) {
             $params['since_id'] = $sinceId;
+        }
+
+        if (!empty($exclude)) {
+            $params['exclude'] = implode(',', $exclude);
         }
 
         $queryString = http_build_query($params);
