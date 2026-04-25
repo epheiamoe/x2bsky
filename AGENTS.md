@@ -126,6 +126,24 @@ scp -r local/api/* myvps:/www/wwwroot/x2bsky.desuwa.org/api/
 - 原因: 帖子已存在于 `posts` 表但 `fetched_posts.synced=0` 或无 Bluesky 目标
 - 解决: Archive 页面为这类帖子显示 "Sync to BSKY" 按钮，可重新触发同步
 
+## API 成本决策
+
+### X API 费用说明
+- **获取自己账号内容**: 便宜
+- **获取别人账号内容**: 仍然昂贵
+- **政策**: 不要额外调用 API 获取别人的内容
+
+### 媒体获取策略
+- **Fetch 阶段**: 从用户时间线获取推文时，通过 `expansions` 附带获取媒体 URL
+- **RT 媒体**: 通过 `referenced_tweets.id` expansion 获取（免费，随时间线返回）
+- **禁止行为**: 不要在 fetch 时额外调用 `getTweetById()` 获取原帖媒体
+- **同步阶段**: 直接从 `pbs.twimg.com` 下载媒体（无需额外 API 调用）
+
+### 本地媒体处理
+- **不持久保存**: fetch 后不保存媒体文件到本地
+- **同步时获取**: sync 时直接从 pbs.twimg.com 下载到临时目录
+- **上传后清理**: 上传到 Bluesky 后删除临时文件
+
 ## 调试方法
 
 ### 查看 Worker 日志
