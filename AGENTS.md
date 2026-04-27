@@ -51,9 +51,12 @@ scp -r local/api/* myvps:/www/wwwroot/x2bsky.desuwa.org/api/
 ### X API 调用
 - 文件: `src/Api/XApiClient.php`
 - 重要方法:
-  - `fetchUserTweets()` - 获取用户推文
-  - 自动过滤回复
-  - 提取 `quoted_url`
+  - `fetchUserTweets()` - 获取并过滤用户推文，自动替换 `note_tweet.text`（长推文完整文本）
+  - `getUserTweets()` - 简化版获取（SyncEngine/cron 用），设置 `_full_text` 字段
+  - 自回帖（线程续篇）：通过对比 `author_id` 判断，自回帖保留，回复他人跳过
+  - RT 文本：从 `includes.tweets` 引用原帖获取完整文本，`_rt_author` 单独保存
+  - `quoted_url`：排除 `/photo/` 等媒体 URL
+  - **重要**: `tweet.fields` 必须包含 `note_tweet` 才能获取 Premium 长推文完整文本
 
 ### 文本处理
 - 文件: `src/Api/TextProcessor.php`
@@ -108,6 +111,15 @@ scp -r local/api/* myvps:/www/wwwroot/x2bsky.desuwa.org/api/
 #### t.co 短链接出现在同步后的帖子
 - 原因: fetch.php 没有替换短链接
 - 解决: 使用 `entities.urls` 中的 `expanded_url` 替换
+
+#### X 长推文同步后只显示几十字（内容截断）
+- 原因: X Premium 长推文的完整文本在 `note_tweet.text`，`text` 字段是截断版本
+- 解决: `tweet.fields` 必须包含 `note_tweet`，处理时优先使用 `note_tweet.text`
+- 涉及: `XApiClient.php` 的 `fetchUserTweets()` 和 `getUserTweets()`
+
+#### RT 文本截断（只有十几个字）
+- 原因: RT tweet 的 `text` 只有片段，完整文本在 `includes.tweets` 的引用原帖中
+- 解决: 从 `tweetMap[refId]` 读取原帖的 `note_tweet.text`，`_rt_author` 单独保存
 
 #### "Post not found" when fetching referenced tweets
 - 原因: deleted tweets 的 expansions 返回 404

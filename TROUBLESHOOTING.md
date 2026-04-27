@@ -137,7 +137,50 @@ Media count: 3
 
 当原推文有媒体时，RT 会自动包含媒体 URL，不需要额外 API 调用。
 
-### 3. API 成本决策
+### 4. X Premium 长推文文本截断 (note_tweet)
+
+**问题描述：**
+X Premium 用户的长推文 (>280 字) 同步到 Bluesky 后只显示前几十个字，完整内容丢失。
+
+**原因分析：**
+X API v2 对长推文使用两个字段：
+- `text` — 截断版本（280 字左右 + 短链接）
+- `note_tweet.text` — 完整全文（Premium 用户可达数千字）
+
+之前的代码只请求了 `text` 字段，未包含 `note_tweet`。
+
+**解决方案：**
+1. 在 `tweet.fields` 中添加 `note_tweet`
+2. 处理 tweet 时优先使用 `note_tweet['text']`
+3. RT 的引用原帖同样检查 `note_tweet.text`
+
+```php
+// 请求时
+'tweet.fields' => '...,note_tweet'
+
+// 处理时
+$fullText = $tweet['note_tweet']['text'] ?? $tweet['text'];
+```
+
+**涉及文件：** `src/Api/XApiClient.php`, `src/Api/fetch.php`
+
+### 5. RT 文本截断
+
+**问题描述：**
+转推同步后只有十几个字，原推完整内容丢失。
+
+**原因分析：**
+X API 返回的 RT tweet 的 `text` 字段只包含 "RT @user: 开头片段…"。
+完整文本在 `includes.tweets` 中的引用原推（含 `note_tweet.text`）。
+
+**解决方案：**
+从 `tweetMap[originalTweetId]` 读取完整文本，并单独保存 `_rt_author`：
+```php
+$tweet['_rt_author'] = $m[1];  // 从 RT 前缀提取
+$tweet['text'] = $originalTweet['note_tweet']['text'] ?? $originalTweet['text'];
+```
+
+**涉及文件：** `src/Api/XApiClient.php`
 
 **原则：**
 - 获取自己账号内容：便宜
@@ -271,6 +314,8 @@ Logger::info('Created thread post', [
 
 | 错误信息 | 原因 | 解决方案 |
 |---------|------|---------|
+| X 长推文同步后只显示几十字 | `note_tweet` 字段未请求 | 添加 `note_tweet` 到 `tweet.fields` |
+| RT 文本只有十几个字 | 未读取引用原帖完整文本 | 从 `includes.tweets` 获取原帖 `note_tweet.text` |
 | `Expected "image/*" (got "multipart/form-data")` | blob 上传格式错误 | 使用 binary 方式上传 |
 | `Missing required key "cid"` | reply 对象缺少 CID | 传递完整的 uri+cid 对象 |
 | `Expected object value type at $.record.reply.root` | reply 是字符串而非对象 | 传递数组格式的 reply |

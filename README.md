@@ -9,7 +9,7 @@ X (Twitter) to Bluesky cross-poster - Archive your X posts to Bluesky with a bea
 
 - **Manual & Automatic Sync** - Fetch posts from X API and sync to Bluesky on your schedule
 - **Media Support** - Images are automatically downloaded, compressed, and uploaded to Bluesky
-- **Long Post Handling** - Long posts are intelligently split across multiple Bluesky posts
+- **Long Post Handling** - X Premium long-form posts (via `note_tweet` API field) are intelligently split into Bluesky threads
 - **Quote & Retweet Preservation** - Quote tweets include the referenced link, RTs show original author
 - **Duplicate Detection** - Posts are deduplicated based on content hash
 - **Job Queue** - Redis-backed queue with MySQL fallback for reliability

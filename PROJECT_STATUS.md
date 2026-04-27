@@ -256,9 +256,13 @@ CREATE TABLE `logs` (
 ## X API 过滤规则
 
 通过 `referenced_tweets.type` 判断:
-- `replied_to` → **跳过** (不显示在列表)
-- `retweeted` → 可选同步 (默认不勾选)
-- `quoted` → 直接包含链接，引用 URL 存在 `quoted_url` 字段
+- `replied_to` → 检查引用 tweet 的 `author_id`：如果是自己的 tweet（自回帖/线程续篇）则保留，回复他人则跳过
+- `retweeted` → 可选同步 (默认不勾选)，从 `includes.tweets` 获取原帖完整文本（含 `note_tweet`）
+- `quoted` → 直接包含链接，引用 URL 存在 `quoted_url` 字段，排除 `/photo/` 类媒体 URL
+
+### note_tweet 字段
+X Premium 长推文（>280 字）的完整文本存储在 `note_tweet.text`，普通 `text` 字段是截断版本。
+`fetchUserTweets()` 和 `getUserTweets()` 都请求此字段并在处理时优先使用完整文本。
 
 ## VPS 部署信息
 
@@ -438,45 +442,14 @@ private function getMimeType(string $path): string
 
 ## 更新日志
 
-### 2026-04-25 - v5 分页和同步修复
+详见 [CHANGELOG.md](./CHANGELOG.md)（Keep a Changelog 格式）。
 
-**Bug 修复**:
-- Retweet 媒体不同步：XApiClient 添加 `referenced_tweets.id` 到 expansions
-- Archive 页面标题统一为 "Archive"
+当前版本: **0.6.0**
 
-**新功能**:
-- Archive 分页设置 (`history_per_page`, `history_max_pages`)
-- Archive 页面的 "Sync to BSKY" 按钮，可重新同步 X-only 帖子
-
-### 2026-04-24 - v4 修复版
-
-**Bug 修复**:
-- MySQL `datetime("now")` → `NOW()` 语法修复
-- Bluesky blob 上传 multipart → binary 修复
-- Bluesky createdAt 时区修复 (UTC)
-- X t.co 短链接自动替换
-- Bluesky session 路径修复
-- `mime_content_type()` 函数不可用修复
-
-**新功能**:
-- 设置页面新增 `thread_media_position` 选项
-- 同步结果详细错误信息
-- 线程进度显示
-
-### 2026-04-24 - v3 数据库重构
-- 迁移 SQLite → MySQL (MariaDB 10.11)
-- 新设计 posts + post_media + synced_destinations 表结构
-- 支持多平台同步 (Bluesky + 个人网站)
-- 媒体链接统一存储，支持 X 和 Bluesky 双平台
-
-### 2026-04-24 - v2 架构重构
-- 新增 fetched_posts 表实现两步流程
-- 用户可选择要同步的帖子
-- 过滤回复 (referenced_tweets.type === 'replied_to')
-- RT 默认不勾选，用户可选择
-- Quote 直接包含链接
-
-### 2026-04-24 - v1 初始版本
-- 基础 X → Bluesky 同步
-- 自动同步所有帖子
-- 回复也被同步 (问题)
+### v0.6.0 (2026-04-27) — 长帖文完整同步
+- X API `note_tweet` 字段支持：Premium 长推文完整文本获取
+- RT 引用原帖完整文本获取（含 `note_tweet`）
+- 自回帖（线程续篇）不再被跳过
+- quoted_url 排除 /photo/ 媒体链接
+- Bluesky `createThread()` 传递完整 `{uri, cid}` 对象
+- Cron/worker 路径使用 `_full_text`

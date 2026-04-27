@@ -1,30 +1,64 @@
 # Changelog
 
-## 2026-04-27 — Fix X long-form post content loss (note_tweet)
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.6.0] - 2026-04-27
 
 ### Fixed
-- **XApiClient**: Add `note_tweet` to `tweet.fields` in both `getUserTweets()` and `fetchUserTweets()`.  
-  X Premium long-form tweets (>280 chars) expose full text only via `note_tweet.text`; the `text`
-  field is always truncated.  Previously the full text was silently discarded, syncing only a few
-  dozen characters of posts that may be thousands of characters long.
-- **XApiClient**: For retweets, replace truncated RT text with the full original tweet text from
-  `includes.tweets` (including `note_tweet.text` if present).  Store `_rt_author` separately so
-  `api/fetch.php` can still record the original author.
-- **XApiClient**: Exclude `/photo/` URLs when extracting `_quoted_url` from entities; previously
-  `https://x.com/user/status/123/photo/1` matched `/status/` and was incorrectly used as the
-  quote link.
-- **XApiClient**: Allow self-replies (thread continuations) through the filter.  Replies to
-  other users are still skipped, but a tweet that replies to the user's own tweet (determined
-  by `author_id` from `includes.tweets`) is now treated as `original` and synced.
-- **SyncEngine**: Use `_full_text` field in `enqueuePost()`, `filterNewTweets()`, and
-  `processQueueItem()` so the cron/worker path also benefits from the full-text resolution.
-- **BlueskyClient**: `createThread()` now passes `{uri, cid}` objects for both `parent` and
-  `root` in reply references, matching the format used by `api/sync.php`.
+- X Premium long-form tweets (>280 chars) now correctly capture full text via `note_tweet` X API field. Previously only the truncated `text` field was used, losing 95%+ of post content.
+- Retweets now capture the full original tweet text from `includes.tweets` (including `note_tweet.text`), instead of the truncated RT preview text.
+- Quoted tweet URL extraction no longer incorrectly matches `/photo/N` URLs that also contain `/status/`.
+- Self-replies (thread continuations) are no longer skipped. Only replies to other users are filtered out.
+- Bluesky `createThread()` now passes `{uri, cid}` objects for both `parent` and `root`, matching `api/sync.php` format.
+- Cron/worker path (`SyncEngine`) now uses full text (`_full_text`) for processing and deduplication.
+
+## [0.5.0] - 2026-04-25
+
+### Fixed
+- Retweet media not synced: added `referenced_tweets.id` to X API expansions.
+- Archive page title unified to "Archive".
 
 ### Added
-- **TextProcessor**: Stub `validateThreadNotation()` with TODO for verifying Bluesky thread
-  completeness by matching `(1/n)` notation suffixes on post text.
+- Archive pagination settings (`history_per_page`, `history_max_pages`).
+- "Sync to BSKY" button on Archive page for X-only posts.
+
+## [0.4.0] - 2026-04-24
+
+### Fixed
+- MySQL `datetime("now")` → `NOW()` syntax errors across multiple files.
+- Bluesky blob upload switched from multipart to binary format.
+- Bluesky `createdAt` timezone corrected to UTC (`gmdate()`).
+- X t.co short links auto-replaced with `expanded_url`.
+- Bluesky session path resolved to absolute for worker context.
+- `mime_content_type()` fallback for servers without fileinfo extension.
+
+### Added
+- `thread_media_position` setting (first or last post in thread).
+- Detailed error info in sync results.
+- Thread progress display.
+
+## [0.3.0] - 2026-04-24
 
 ### Changed
-- **api/fetch.php**: Prefer `_rt_author` from XApiClient's resolved data instead of parsing
-  `RT @user:` from (potentially already-resolved) text.
+- Migrated from SQLite to MySQL (MariaDB 10.11).
+- Redesigned schema: `posts` + `post_media` + `synced_destinations`.
+- Multi-platform sync support (Bluesky + personal website).
+
+## [0.2.0] - 2026-04-24
+
+### Added
+- `fetched_posts` table for two-step fetch-then-sync flow.
+- User-selectable posts to sync.
+- Reply filtering via `referenced_tweets.type`.
+- RT default unchecked, user can opt-in.
+- Quote tweets include referenced link.
+
+## [0.1.0] - 2026-04-24
+
+### Added
+- Basic X → Bluesky sync.
+- Auto-sync all posts.
+- Initial project setup.
