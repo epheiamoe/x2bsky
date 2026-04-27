@@ -70,11 +70,12 @@ try {
         $isRetweet = ($postType === 'retweeted');
         $isQuote = ($postType === 'quoted');
 
-        $originalAuthor = null;
+        $originalAuthor = $tweet['_rt_author'] ?? null;
         $originalUrl = null;
 
         if ($isRetweet) {
-            if (preg_match('/^RT @(\w+):\s*/', $text, $matches)) {
+            if ($originalAuthor) {
+            } elseif (preg_match('/^RT @(\w+):\s*/', $text, $matches)) {
                 $originalAuthor = $matches[1];
                 $text = preg_replace('/^RT @(\w+):\s*/', '', $text, 1);
             }

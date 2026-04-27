@@ -106,6 +106,19 @@ class TextProcessor
         return $segments;
     }
 
+    /**
+     * TODO: Given a flat list of Bluesky posts (fetched by getPostThread), detect
+     * whether they form a complete thread by matching (1/n)..(n/n) notation at the
+     * end of each post's text.  This can be used to verify sync integrity and
+     * detect missing/dropped segments without re-reading from X.
+     */
+    public static function validateThreadNotation(array $posts): array
+    {
+        // Future: walk posts, parse (i/total) suffix, check count == total,
+        // return list of missing segment indices.
+        return [];
+    }
+
     public static function generateTextHash(string $text): string
     {
         $text = preg_replace('/\s+/', ' ', trim($text));

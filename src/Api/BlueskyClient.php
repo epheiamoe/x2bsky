@@ -261,7 +261,9 @@ class BlueskyClient
     {
         $results = [];
         $parentUri = null;
+        $parentCid = null;
         $rootUri = null;
+        $rootCid = null;
 
         foreach ($posts as $index => $post) {
             $embed = null;
@@ -277,17 +279,23 @@ class BlueskyClient
 
             $replyRef = null;
             if ($parentUri) {
-                $replyRef = ['parent' => $parentUri, 'root' => $rootUri];
+                $replyRef = [
+                    'parent' => ['uri' => $parentUri, 'cid' => $parentCid],
+                    'root' => ['uri' => $rootUri, 'cid' => $rootCid],
+                ];
             }
 
             $result = $this->createPost($post['text'], $embed, $replyRef);
 
             if ($result) {
                 $uri = $result['uri'];
+                $cid = $result['cid'];
                 if ($index === 0) {
                     $rootUri = $uri;
+                    $rootCid = $cid;
                 }
                 $parentUri = $uri;
+                $parentCid = $cid;
                 $results[] = $result;
             } else {
                 Logger::error('Failed to create post in thread', ['index' => $index]);

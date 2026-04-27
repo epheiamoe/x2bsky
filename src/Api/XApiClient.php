@@ -68,7 +68,7 @@ class XApiClient
 
         $params = [
             'max_results' => min(max($maxResults, 5), 100),
-            'tweet.fields' => 'id,text,created_at,entities,attachments,possibly_sensitive,referenced_tweets,edit_history_tweet_ids',
+            'tweet.fields' => 'id,text,created_at,entities,attachments,possibly_sensitive,referenced_tweets,edit_history_tweet_ids,note_tweet',
             'expansions' => 'attachments.media_keys,referenced_tweets.id',
             'media.fields' => 'url,preview_image_url,type,duration_ms,width,height,alt_text,media_key',
         ];
@@ -123,6 +123,8 @@ class XApiClient
 
         foreach ($tweets as &$tweet) {
             $tweet['_media'] = [];
+            $tweet['_full_text'] = $tweet['note_tweet']['text'] ?? $tweet['text'];
+
             if (isset($tweet['attachments']['media_keys'])) {
                 foreach ($tweet['attachments']['media_keys'] as $key) {
                     if (isset($mediaMap[$key])) {
@@ -142,7 +144,7 @@ class XApiClient
 
         $params = [
             'max_results' => min(max($maxResults, 5), 100),
-            'tweet.fields' => 'id,text,created_at,entities,attachments,possibly_sensitive,referenced_tweets,edit_history_tweet_ids,author_id',
+            'tweet.fields' => 'id,text,created_at,entities,attachments,possibly_sensitive,referenced_tweets,edit_history_tweet_ids,author_id,note_tweet',
             'expansions' => 'attachments.media_keys,referenced_tweets.id',
             'media.fields' => 'url,preview_image_url,type,duration_ms,width,height,alt_text,media_key',
         ];
@@ -209,12 +211,26 @@ class XApiClient
             $postType = $this->getPostType($tweet);
 
             if ($postType === 'replied_to') {
-                continue;
+                $isSelfReply = false;
+                foreach ($tweet['referenced_tweets'] as $ref) {
+                    if ($ref['type'] === 'replied_to' && isset($ref['id'])) {
+                        if (isset($tweetMap[$ref['id']])) {
+                            $refAuthorId = $tweetMap[$ref['id']]['author_id'] ?? '';
+                            $isSelfReply = ($refAuthorId === $this->userId);
+                        }
+                        break;
+                    }
+                }
+                if (!$isSelfReply) {
+                    continue;
+                }
+                $postType = 'original';
             }
 
             $tweet['_post_type'] = $postType;
             $tweet['_media'] = [];
             $tweet['_quoted_url'] = null;
+            $tweet['_rt_author'] = null;
 
             if ($postType === 'retweeted' && isset($tweet['referenced_tweets'])) {
                 foreach ($tweet['referenced_tweets'] as $ref) {
@@ -223,6 +239,10 @@ class XApiClient
 
                         if (isset($tweetMap[$originalTweetId])) {
                             $originalTweet = $tweetMap[$originalTweetId];
+                            if (preg_match('/^RT @(\w+):/', $tweet['text'], $m)) {
+                                $tweet['_rt_author'] = $m[1];
+                            }
+                            $tweet['text'] = $originalTweet['note_tweet']['text'] ?? $originalTweet['text'] ?? $tweet['text'];
                             if (isset($originalTweet['attachments']['media_keys'])) {
                                 foreach ($originalTweet['attachments']['media_keys'] as $key) {
                                     if (isset($mediaMap[$key])) {
@@ -234,17 +254,23 @@ class XApiClient
                         break;
                     }
                 }
-            } elseif (isset($tweet['attachments']['media_keys'])) {
-                foreach ($tweet['attachments']['media_keys'] as $key) {
-                    if (isset($mediaMap[$key])) {
-                        $tweet['_media'][] = $mediaMap[$key];
+            } else {
+                if (!empty($tweet['note_tweet']['text'])) {
+                    $tweet['text'] = $tweet['note_tweet']['text'];
+                }
+                if (isset($tweet['attachments']['media_keys'])) {
+                    foreach ($tweet['attachments']['media_keys'] as $key) {
+                        if (isset($mediaMap[$key])) {
+                            $tweet['_media'][] = $mediaMap[$key];
+                        }
                     }
                 }
             }
 
             if ($postType === 'quoted' && isset($tweet['entities']['urls'])) {
                 foreach ($tweet['entities']['urls'] as $url) {
-                    if (!empty($url['expanded_url']) && strpos($url['expanded_url'], '/status/') !== false) {
+                    if (!empty($url['expanded_url']) && strpos($url['expanded_url'], '/status/') !== false
+                        && strpos($url['expanded_url'], '/photo/') === false) {
                         $tweet['_quoted_url'] = $url['expanded_url'];
                         break;
                     }

@@ -84,7 +84,8 @@ class SyncEngine
         $filtered = [];
         foreach ($tweets as $tweet) {
             if (!in_array($tweet['id'], $existingIds)) {
-                $textHash = md5($tweet['text']);
+                $fullText = $tweet['_full_text'] ?? $tweet['text'];
+                $textHash = md5($fullText);
                 $stmt = $pdo->prepare('SELECT id FROM synced_posts WHERE text_hash = ?');
                 $stmt->execute([$textHash]);
                 if (!$stmt->fetch()) {
@@ -99,6 +100,7 @@ class SyncEngine
     private function enqueuePost(string $jobId, array $tweet): void
     {
         $pdo = Database::getInstance();
+        $fullText = $tweet['_full_text'] ?? $tweet['text'];
 
         $stmt = $pdo->prepare('
             INSERT INTO synced_posts (x_post_id, x_post_url, text_hash, text_preview, status)
@@ -108,8 +110,8 @@ class SyncEngine
         $stmt->execute([
             $tweet['id'],
             $url,
-            md5($tweet['text']),
-            mb_substr($tweet['text'], 0, 100)
+            md5($fullText),
+            mb_substr($fullText, 0, 100)
         ]);
 
         QueueManager::enqueue($jobId, $tweet['id'], $tweet);
@@ -124,7 +126,8 @@ class SyncEngine
         Logger::info('Processing queue item', ['job_id' => $jobId, 'x_post_id' => $xPostId]);
 
         try {
-            $segments = $this->splitPost($postData['text']);
+            $text = $postData['_full_text'] ?? $postData['text'];
+            $segments = $this->splitPost($text);
 
             if (!empty($postData['_media'])) {
                 $mediaResult = MediaProcessor::processMedia($postData['_media'], $xPostId);
