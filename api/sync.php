@@ -89,7 +89,7 @@ try {
                 continue;
             }
 
-            $isVideo = ($media['type'] ?? '') === 'video';
+            $isVideo = ($media['type'] ?? '') === 'video' && !empty($media['variants'] ?? []);
             $mediaData = @file_get_contents($media['url']);
             if (!$mediaData) {
                 Logger::warning('Failed to download media', ['url' => $media['url'], 'type' => $media['type'] ?? 'unknown']);
