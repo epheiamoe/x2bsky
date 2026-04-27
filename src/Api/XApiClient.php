@@ -70,7 +70,7 @@ class XApiClient
             'max_results' => min(max($maxResults, 5), 100),
             'tweet.fields' => 'id,text,created_at,entities,attachments,possibly_sensitive,referenced_tweets,edit_history_tweet_ids,note_tweet',
             'expansions' => 'attachments.media_keys,referenced_tweets.id',
-            'media.fields' => 'url,preview_image_url,type,duration_ms,width,height,alt_text,media_key',
+            'media.fields' => 'url,preview_image_url,type,duration_ms,width,height,alt_text,media_key,variants',
         ];
 
         if ($sinceId) {
@@ -146,7 +146,7 @@ class XApiClient
             'max_results' => min(max($maxResults, 5), 100),
             'tweet.fields' => 'id,text,created_at,entities,attachments,possibly_sensitive,referenced_tweets,edit_history_tweet_ids,author_id,note_tweet',
             'expansions' => 'attachments.media_keys,referenced_tweets.id',
-            'media.fields' => 'url,preview_image_url,type,duration_ms,width,height,alt_text,media_key',
+            'media.fields' => 'url,preview_image_url,type,duration_ms,width,height,alt_text,media_key,variants',
         ];
 
         if ($sinceId) {
