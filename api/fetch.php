@@ -112,14 +112,38 @@ try {
         if (!empty($tweet['_media'])) {
             $mediaData = [];
             foreach ($tweet['_media'] as $media) {
-                $mediaData[] = [
-                    'media_key' => $media['media_key'] ?? '',
-                    'type' => $media['type'] ?? 'unknown',
-                    'url' => $media['url'] ?? $media['preview_image_url'] ?? '',
-                    'alt_text' => $media['alt_text'] ?? '',
-                    'width' => $media['width'] ?? 0,
-                    'height' => $media['height'] ?? 0,
-                ];
+                $mediaType = $media['type'] ?? 'unknown';
+                if ($mediaType === 'video') {
+                    $bestUrl = '';
+                    $bestBitrate = 0;
+                    foreach ($media['variants'] ?? [] as $variant) {
+                        $br = (int)($variant['bit_rate'] ?? 0);
+                        if (($variant['content_type'] ?? '') === 'video/mp4' && $br > $bestBitrate) {
+                            $bestBitrate = $br;
+                            $bestUrl = $variant['url'] ?? '';
+                        }
+                    }
+                    $mediaData[] = [
+                        'media_key' => $media['media_key'] ?? '',
+                        'type' => 'video',
+                        'url' => $bestUrl ?: ($media['url'] ?? $media['preview_image_url'] ?? ''),
+                        'preview_image_url' => $media['preview_image_url'] ?? '',
+                        'variants' => $media['variants'] ?? [],
+                        'duration_ms' => $media['duration_ms'] ?? 0,
+                        'alt_text' => $media['alt_text'] ?? '',
+                        'width' => $media['width'] ?? 0,
+                        'height' => $media['height'] ?? 0,
+                    ];
+                } else {
+                    $mediaData[] = [
+                        'media_key' => $media['media_key'] ?? '',
+                        'type' => $mediaType,
+                        'url' => $media['url'] ?? $media['preview_image_url'] ?? '',
+                        'alt_text' => $media['alt_text'] ?? '',
+                        'width' => $media['width'] ?? 0,
+                        'height' => $media['height'] ?? 0,
+                    ];
+                }
             }
             $mediaJson = json_encode($mediaData);
         }

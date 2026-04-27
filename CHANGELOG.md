@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `set_auth.sh` — CLI script to set/update admin password with automatic web-user ownership fix.
+- Video media support: X videos are now downloaded and posted to Bluesky as `app.bsky.embed.video` instead of a static thumbnail image.
+
+### Fixed
+- `Auth::getPasswordHash()` no longer crashes when the hash file exists but is unreadable (permission denied). Instead it logs the error and returns an invalid hash so login fails gracefully.
+- `login.php` now shows "Password file not readable — run set_auth.sh" when the hash file has permission issues.
+- `api/fetch.php`: video media from X API now stores the best-quality MP4 variant URL instead of the static thumbnail.
+- `api/sync.php`: media download and embed building now branch on image vs video type.
 
 ### Changed
 - `Auth::getPasswordHash()` no longer crashes when the hash file exists but is unreadable (permission denied). Instead it logs the error and returns an invalid hash so login fails gracefully.

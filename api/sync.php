@@ -82,27 +82,31 @@ try {
 
         $blobs = [];
         $altTexts = [];
+        $mediaTypes = [];
 
         foreach ($mediaItems as $media) {
             if (empty($media['url'])) {
                 continue;
             }
 
-            $imgData = @file_get_contents($media['url']);
-            if (!$imgData) {
-                Logger::warning('Failed to download media', ['url' => $media['url']]);
+            $isVideo = ($media['type'] ?? '') === 'video';
+            $mediaData = @file_get_contents($media['url']);
+            if (!$mediaData) {
+                Logger::warning('Failed to download media', ['url' => $media['url'], 'type' => $media['type'] ?? 'unknown']);
                 continue;
             }
 
-            $tempFile = sys_get_temp_dir() . '/x2bsky_' . bin2hex(random_bytes(8)) . '.jpg';
-            file_put_contents($tempFile, $imgData);
+            $ext = $isVideo ? '.mp4' : '.jpg';
+            $tempFile = sys_get_temp_dir() . '/x2bsky_' . bin2hex(random_bytes(8)) . $ext;
+            file_put_contents($tempFile, $mediaData);
 
-            $size = @getimagesize($tempFile);
-            if ($size && ($size[0] > 4000 || $size[1] > 4000 || strlen($imgData) > 2097152)) {
-                $tempFile = compressImage($tempFile, $size);
+            if (!$isVideo) {
+                $size = @getimagesize($tempFile);
+                if ($size && ($size[0] > 4000 || $size[1] > 4000 || strlen($mediaData) > 2097152)) {
+                    $tempFile = compressImage($tempFile, $size);
+                }
             }
 
-            $mime = getMimeType($tempFile);
             $blob = $bsky->uploadBlob($tempFile);
 
             @unlink($tempFile);
@@ -110,6 +114,7 @@ try {
             if ($blob) {
                 $blobs[] = $blob;
                 $altTexts[] = $media['alt_text'] ?? '';
+                $mediaTypes[] = $isVideo ? 'video' : 'image';
             }
         }
 
@@ -133,17 +138,35 @@ try {
             );
 
             if ($shouldAttachMedia) {
-                $images = [];
-                foreach ($blobs as $j => $blob) {
-                    $images[] = [
-                        'image' => $blob,
-                        'alt' => $altTexts[$j] ?? ''
+                $hasVideo = in_array('video', $mediaTypes, true);
+                $imageIndices = array_keys(array_filter($mediaTypes, fn($t) => $t === 'image'));
+                $videoIndex = array_search('video', $mediaTypes, true);
+
+                if ($hasVideo && empty($imageIndices)) {
+                    $embed = [
+                        '$type' => 'app.bsky.embed.video',
+                        'video' => $blobs[$videoIndex],
                     ];
+                    if (!empty($altTexts[$videoIndex])) {
+                        $embed['alt'] = $altTexts[$videoIndex];
+                    }
+                } else {
+                    $images = [];
+                    foreach ($blobs as $j => $blob) {
+                        if ($mediaTypes[$j] === 'image') {
+                            $images[] = [
+                                'image' => $blob,
+                                'alt' => $altTexts[$j] ?? ''
+                            ];
+                        }
+                    }
+                    if (!empty($images)) {
+                        $embed = [
+                            '$type' => 'app.bsky.embed.images',
+                            'images' => $images
+                        ];
+                    }
                 }
-                $embed = [
-                    '$type' => 'app.bsky.embed.images',
-                    'images' => $images
-                ];
             }
 
             $replyRef = null;
@@ -254,6 +277,9 @@ function getMimeType(string $path): string
         'png' => 'image/png',
         'gif' => 'image/gif',
         'webp' => 'image/webp',
+        'mp4' => 'video/mp4',
+        'mov' => 'video/quicktime',
+        'webm' => 'video/webm',
     ];
     return $mimeTypes[$ext] ?? 'image/jpeg';
 }
