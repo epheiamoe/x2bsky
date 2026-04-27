@@ -12,6 +12,7 @@ use X2BSky\Api\TextProcessor;
 use X2BSky\Logger;
 
 header('Content-Type: application/json');
+ini_set('display_errors', '0');
 
 Config::init(APP_ROOT . '/.env');
 
@@ -220,7 +221,7 @@ try {
                 $platformUrl = 'https://bsky.app/profile/' . $bskyHandle . '/post/' . basename($finalUri);
                 $stmt->execute([$masterPostId, 'bluesky', $platformUrl, $finalUri, 'synced']);
 
-                foreach ($blobs as $blob) {
+                foreach ($blobs as $j => $blob) {
                     $stmt = $pdo->prepare('
                         INSERT INTO post_media (post_id, platform, media_type, original_url, local_path, alt_text)
                         VALUES (?, ?, ?, ?, ?, ?)

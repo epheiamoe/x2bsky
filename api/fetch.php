@@ -11,6 +11,7 @@ use X2BSky\Api\XApiClient;
 use X2BSky\Logger;
 
 header('Content-Type: application/json');
+ini_set('display_errors', '0');
 
 Config::init(APP_ROOT . '/.env');
 
