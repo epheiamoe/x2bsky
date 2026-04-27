@@ -19,9 +19,17 @@ SSH: myvps
 
 ### 首次修改流程
 1. 修改本地文件（`E:\Epheia\dev\apps\vps_serves\x2bsky\x2bsky\`）
-2. 使用 scp 上传到 VPS
+2. 使用 scp 上传到 VPS（或 git pull）
 3. 验证修改
 4. 测试功能
+
+### 初始化 / 修改密码
+```bash
+# 在服务器项目目录下运行
+ssh myvps
+cd /www/wwwroot/x2bsky.desuwa.org
+./set_auth.sh                  # 交互式输入密码
+./set_auth.sh --password MY_PW # 命令行传参
 
 ### 常用上传命令
 ```bash
@@ -239,15 +247,21 @@ ssh myvps "ps aux | grep worker.php | grep -v grep"
 ## 文件修改 Checklist
 
 修改任何文件后：
-1. [ ] scp 上传到 VPS
-2. [ ] 验证文件内容
-3. [ ] 测试相关功能
-4. [ ] 检查日志
+1. [ ] git commit & push
+2. [ ] 服务器 git pull（`ssh myvps 'cd /www/wwwroot/x2bsky.desuwa.org && git pull'`）
+3. [ ] 验证文件内容
+4. [ ] 测试相关功能
+5. [ ] 检查日志
 
 ## 敏感信息
 
 ### .env 文件位置
 `/www/wwwroot/x2bsky.desuwa.org/.env`
+
+### 密码管理
+- 使用 `./set_auth.sh`（不要手动编辑 `data/.password_hash`）
+- `data/.password_hash` 应属于 Web 运行用户（`www`/`www-data`），权限 600
+- 若登录页显示 "Password file is not readable"，运行 `./set_auth.sh` 修复权限
 
 ### 包含内容
 - 数据库凭据

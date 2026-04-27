@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `set_auth.sh` — CLI script to set/update admin password with automatic web-user ownership fix.
+
+### Changed
+- `Auth::getPasswordHash()` no longer crashes when the hash file exists but is unreadable (permission denied). Instead it logs the error and returns an invalid hash so login fails gracefully.
+- `login.php` now shows "Password file not readable — run set_auth.sh" when the hash file has permission issues.
+
+### Removed
+- `init_auth.php` (replaced by `set_auth.sh`).
+
 ## [0.6.0] - 2026-04-27
 
 ### Fixed

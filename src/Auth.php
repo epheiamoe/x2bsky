@@ -43,13 +43,25 @@ class Auth
         $hashFile = dirname(__DIR__) . self::PASSWORD_HASH_FILE;
 
         if (file_exists($hashFile)) {
-            self::$passwordHash = trim(file_get_contents($hashFile));
+            $contents = @file_get_contents($hashFile);
+            if ($contents !== false) {
+                self::$passwordHash = trim($contents);
+                return self::$passwordHash;
+            }
+            Logger::error('Password hash file exists but is not readable', ['file' => $hashFile]);
+            self::$passwordHash = '';
             return self::$passwordHash;
         }
 
         $fallback = Config::get('ADMIN_PASSWORD', 'x2bsky_admin');
         self::$passwordHash = password_hash($fallback, PASSWORD_DEFAULT);
         return self::$passwordHash;
+    }
+
+    public static function isPasswordFileBroken(): bool
+    {
+        $hashFile = dirname(__DIR__) . self::PASSWORD_HASH_FILE;
+        return file_exists($hashFile) && !is_readable($hashFile);
     }
 
     public static function setPassword(string $password): bool

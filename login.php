@@ -21,7 +21,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: index.php');
         exit;
     } else {
-        $error = 'Invalid password';
+        if (Auth::isPasswordFileBroken()) {
+            $error = 'Password file is not readable by the web server. Run ./set_auth.sh on the server to fix.';
+        } else {
+            $error = 'Invalid password';
+        }
     }
 }
 ?>

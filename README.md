@@ -105,7 +105,17 @@ server {
 2. Create a project and app
 3. Generate OAuth 1.0a credentials and Bearer token
 
-### 8. Start
+### 8. Set Admin Password
+
+```bash
+# Interactive (recommended)
+./set_auth.sh
+
+# Or via command line
+./set_auth.sh --password your_password
+```
+
+### 9. Start
 
 ```bash
 # Start the worker (background job processing)
