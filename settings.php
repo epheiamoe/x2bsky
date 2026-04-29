@@ -15,7 +15,9 @@ $success = '';
 $activeTab = $_GET['tab'] ?? 'sync';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['action']) && $_POST['action'] === 'change_password') {
+    if (!Auth::verifyCsrf()) {
+        $error = 'Invalid form submission — please refresh the page and try again.';
+    } elseif (isset($_POST['action']) && $_POST['action'] === 'change_password') {
         $currentPassword = $_POST['current_password'] ?? '';
         $newPassword = $_POST['new_password'] ?? '';
         $confirmPassword = $_POST['confirm_password'] ?? '';
@@ -124,6 +126,7 @@ $historyMaxPages = Settings::get('history_max_pages', 10);
             <h2 class="text-lg font-semibold text-white mb-6">Sync Settings</h2>
 
             <form method="POST" class="space-y-6">
+                <?= Auth::csrfField() ?>
                 <input type="hidden" name="action" value="sync_settings">
 
                 <div class="flex items-center">

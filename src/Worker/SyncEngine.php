@@ -9,6 +9,7 @@ use X2BSky\Database;
 use X2BSky\Logger;
 use X2BSky\Api\XApiClient;
 use X2BSky\Api\BlueskyClient;
+use X2BSky\Api\TextProcessor;
 use X2BSky\Queue\QueueManager;
 use X2BSky\Media\MediaProcessor;
 
@@ -60,9 +61,6 @@ class SyncEngine
         foreach ($filtered as $tweet) {
             $this->enqueuePost($jobId, $tweet);
         }
-
-        $newestId = $filtered[0]['id'];
-        $this->saveSinceId($newestId);
 
         Logger::info('Sync job created', ['job_id' => $jobId, 'posts_to_sync' => count($filtered)]);
 
@@ -127,29 +125,17 @@ class SyncEngine
 
         try {
             $text = $postData['_full_text'] ?? $postData['text'];
-            $segments = $this->splitPost($text);
+            $segments = TextProcessor::splitForBluesky($text, 300);
+            $segments = TextProcessor::addThreadNotation($segments);
 
             if (!empty($postData['_media'])) {
                 $mediaResult = MediaProcessor::processMedia($postData['_media'], $xPostId);
 
-                foreach ($segments as $i => &$segment) {
-                    $segment['_mediaBlob'] = null;
-                    $segment['_mediaAlt'] = '';
-
-                    foreach ($mediaResult as $media) {
-                        if (!empty($media['blobs'])) {
-                            $segment['_mediaBlob'] = $media['blobs'][0]['blob'];
-                            $segment['_mediaAlt'] = $media['blobs'][0]['alt'] ?? '';
-                            break;
-                        }
+                foreach ($mediaResult as $m => $media) {
+                    if (!empty($media['blobs']) && $m === 0) {
+                        $segments[0]['_mediaBlob'] = $media['blobs'][0]['blob'];
+                        $segments[0]['_mediaAlt'] = $media['blobs'][0]['alt'] ?? '';
                     }
-                }
-            }
-
-            foreach ($segments as $i => &$segment) {
-                $segment['text'] = $segment['text'];
-                if (count($segments) > 1) {
-                    $segment['text'] .= sprintf(' (%d/%d)', $i + 1, count($segments));
                 }
             }
 
@@ -159,6 +145,26 @@ class SyncEngine
                 $pdo = Database::getInstance();
                 $stmt = $pdo->prepare('UPDATE synced_posts SET status = "synced", synced_at = NOW() WHERE x_post_id = ?');
                 $stmt->execute([$xPostId]);
+
+                $finalUri = end($results)['uri'];
+                $stmt = $pdo->prepare('SELECT id FROM posts WHERE x_post_id = ?');
+                $stmt->execute([$xPostId]);
+                $postRow = $stmt->fetch();
+                $masterPostId = $postRow ? $postRow['id'] : null;
+
+                if ($masterPostId) {
+                    $bskyHandle = Config::get('BSKY_HANDLE', 'your_handle');
+                    $platformUrl = 'https://bsky.app/profile/' . $bskyHandle . '/post/' . basename($finalUri);
+                    $stmt = $pdo->prepare('INSERT INTO synced_destinations (post_id, platform, platform_post_url, platform_post_uri, status, synced_at) VALUES (?, ?, ?, ?, ?, NOW())');
+                    $stmt->execute([$masterPostId, 'bluesky', $platformUrl, $finalUri, 'synced']);
+
+                    foreach ($postData['_media'] ?? [] as $media) {
+                        $stmt = $pdo->prepare('INSERT INTO post_media (post_id, platform, media_type, original_url, local_path, alt_text) VALUES (?, ?, ?, ?, ?, ?)');
+                        $stmt->execute([$masterPostId, 'bluesky', $media['type'] ?? 'image', $platformUrl, null, $media['alt_text'] ?? '']);
+                    }
+                }
+
+                $this->advanceSinceId($xPostId);
 
                 Logger::info('Post synced successfully', ['x_post_id' => $xPostId, 'bsky_posts' => count($results)]);
                 return true;
@@ -173,89 +179,9 @@ class SyncEngine
             $stmt->execute([$xPostId]);
 
             return false;
+        } finally {
+            MediaProcessor::cleanup();
         }
-    }
-
-    private function splitPost(string $text): array
-    {
-        $maxChars = 300;
-        $segments = [];
-
-        $paragraphs = preg_split('/\n\n+/', $text);
-
-        if ($paragraphs === false) {
-            $paragraphs = [$text];
-        }
-
-        $currentSegment = '';
-        $currentLength = 0;
-
-        foreach ($paragraphs as $paragraph) {
-            $paragraph = trim($paragraph);
-            if ($paragraph === '') {
-                continue;
-            }
-
-            $paraLength = mb_strlen($paragraph);
-
-            if ($paraLength <= $maxChars && $currentLength + $paraLength + 2 <= $maxChars) {
-                $currentSegment .= ($currentSegment ? "\n\n" : '') . $paragraph;
-                $currentLength += ($currentSegment ? 2 : 0) + $paraLength;
-            } elseif ($paraLength > $maxChars) {
-                if ($currentSegment) {
-                    $segments[] = $currentSegment;
-                    $currentSegment = '';
-                    $currentLength = 0;
-                }
-
-                $sentences = preg_split('/(?<=[.!?。！？])\s+/', $paragraph);
-                if ($sentences === false) {
-                    $sentences = [$paragraph];
-                }
-
-                $currentSubSegment = '';
-                foreach ($sentences as $sentence) {
-                    $sentence = trim($sentence);
-                    if ($sentence === '') {
-                        continue;
-                    }
-
-                    $sentenceLen = mb_strlen($sentence);
-
-                    if ($sentenceLen <= $maxChars && $currentLength + $sentenceLen + 1 <= $maxChars) {
-                        $currentSubSegment .= ($currentSubSegment ? ' ' : '') . $sentence;
-                        $currentLength += ($currentSubSegment ? 1 : 0) + $sentenceLen;
-                    } else {
-                        if ($currentSubSegment) {
-                            $segments[] = $currentSubSegment;
-                        }
-                        $currentSubSegment = $sentence;
-                        $currentLength = $sentenceLen;
-                    }
-                }
-
-                if ($currentSubSegment) {
-                    $currentSegment = $currentSubSegment;
-                    $currentLength = mb_strlen($currentSubSegment);
-                }
-            } else {
-                if ($currentSegment) {
-                    $segments[] = $currentSegment;
-                }
-                $currentSegment = $paragraph;
-                $currentLength = $paraLength;
-            }
-        }
-
-        if ($currentSegment) {
-            $segments[] = $currentSegment;
-        }
-
-        if (empty($segments)) {
-            $segments = [mb_substr($text, 0, $maxChars)];
-        }
-
-        return array_map(fn($s) => ['text' => $s], $segments);
     }
 
     private function getLastSinceId(): ?string
@@ -266,7 +192,30 @@ class SyncEngine
         return $row ? $row['x_post_id'] : null;
     }
 
-    private function saveSinceId(string $sinceId): void
+    private function advanceSinceId(string $sinceId): void
+    {
+        $current = $this->readSinceIdFromEnv();
+        if ($current !== null && $sinceId <= $current) {
+            return;
+        }
+        $this->writeSinceIdToEnv($sinceId);
+    }
+
+    private function readSinceIdFromEnv(): ?string
+    {
+        $configPath = dirname(__DIR__, 2) . '/.env';
+        if (!file_exists($configPath)) {
+            return null;
+        }
+        foreach (file($configPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+            if (str_starts_with(trim($line), 'X_SINCE_ID=')) {
+                return trim(substr($line, strpos($line, '=') + 1));
+            }
+        }
+        return null;
+    }
+
+    private function writeSinceIdToEnv(string $sinceId): void
     {
         $configPath = dirname(__DIR__, 2) . '/.env';
         $content = file_get_contents($configPath);

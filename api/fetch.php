@@ -154,41 +154,50 @@ try {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ');
         $urlToStore = $isRetweet ? ($originalUrl ?? null) : ($tweet['_quoted_url'] ?? null);
-        $stmt->execute([$xPostId, $xUrl, $text, $textHash, $isRetweet, $isQuote, $originalAuthor, $urlToStore, $mediaJson, $xCreatedAt]);
 
-        $stmt = $pdo->prepare('
-            INSERT INTO posts (x_post_id, x_post_url, x_author, text, text_hash, is_retweet, is_quote, original_author, x_created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ');
-        $stmt->execute([$xPostId, $xUrl, null, $text, $textHash, $isRetweet, $isQuote, $originalAuthor, $xCreatedAt]);
+        $pdo->beginTransaction();
+        try {
+            $stmt->execute([$xPostId, $xUrl, $text, $textHash, $isRetweet, $isQuote, $originalAuthor, $urlToStore, $mediaJson, $xCreatedAt]);
 
-        if (!empty($tweet['_media'])) {
-            $postId = $pdo->lastInsertId();
-            $stmt = $pdo->prepare('SELECT id FROM posts WHERE x_post_id = ?');
-            $stmt->execute([$xPostId]);
-            $postRow = $stmt->fetch();
-            $postId = $postRow ? $postRow['id'] : null;
+            $stmt = $pdo->prepare('
+                INSERT INTO posts (x_post_id, x_post_url, x_author, text, text_hash, is_retweet, is_quote, original_author, x_created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ');
+            $stmt->execute([$xPostId, $xUrl, null, $text, $textHash, $isRetweet, $isQuote, $originalAuthor, $xCreatedAt]);
 
-            if ($postId) {
-                foreach ($tweet['_media'] as $media) {
-                    $mediaUrl = $media['url'] ?? $media['preview_image_url'] ?? '';
-                    if ($mediaUrl) {
-                        $stmt = $pdo->prepare('
-                            INSERT INTO post_media (post_id, platform, media_type, original_url, alt_text, width, height)
-                            VALUES (?, ?, ?, ?, ?, ?, ?)
-                        ');
-                        $stmt->execute([
-                            $postId,
-                            'x',
-                            $media['type'] ?? 'image',
-                            $mediaUrl,
-                            $media['alt_text'] ?? '',
-                            $media['width'] ?? 0,
-                            $media['height'] ?? 0
-                        ]);
+            if (!empty($tweet['_media'])) {
+                $postId = $pdo->lastInsertId();
+                $stmt = $pdo->prepare('SELECT id FROM posts WHERE x_post_id = ?');
+                $stmt->execute([$xPostId]);
+                $postRow = $stmt->fetch();
+                $postId = $postRow ? $postRow['id'] : null;
+
+                if ($postId) {
+                    foreach ($tweet['_media'] as $media) {
+                        $mediaUrl = $media['url'] ?? $media['preview_image_url'] ?? '';
+                        if ($mediaUrl) {
+                            $stmt = $pdo->prepare('
+                                INSERT INTO post_media (post_id, platform, media_type, original_url, alt_text, width, height)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                            ');
+                            $stmt->execute([
+                                $postId,
+                                'x',
+                                $media['type'] ?? 'image',
+                                $mediaUrl,
+                                $media['alt_text'] ?? '',
+                                $media['width'] ?? 0,
+                                $media['height'] ?? 0
+                            ]);
+                        }
                     }
                 }
             }
+            $pdo->commit();
+        } catch (\Throwable $te) {
+            $pdo->rollBack();
+            Logger::error('Transaction failed during fetch insert', ['x_post_id' => $xPostId, 'error' => $te->getMessage()]);
+            continue;
         }
 
         $inserted++;

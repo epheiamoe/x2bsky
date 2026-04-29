@@ -197,4 +197,30 @@ class Auth
             exit;
         }
     }
+
+    public static function csrfToken(): string
+    {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        if (empty($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+        return $_SESSION['csrf_token'];
+    }
+
+    public static function csrfField(): string
+    {
+        return '<input type="hidden" name="csrf_token" value="' . htmlspecialchars(self::csrfToken()) . '">';
+    }
+
+    public static function verifyCsrf(): bool
+    {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $token = $_POST['csrf_token'] ?? '';
+        $stored = $_SESSION['csrf_token'] ?? '';
+        return $token !== '' && hash_equals($stored, $token);
+    }
 }

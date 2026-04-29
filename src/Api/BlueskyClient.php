@@ -96,6 +96,7 @@ class BlueskyClient
             'expiresAt' => time() + 3600,
         ];
         file_put_contents($this->sessionFile, json_encode($session));
+        @chmod($this->sessionFile, 0600);
     }
 
     private function getHeaders(): array

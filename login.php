@@ -14,7 +14,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
     $remember = isset($_POST['remember']);
 
-    if (Auth::login($password)) {
+    if (!Auth::verifyCsrf()) {
+        $error = 'Invalid form submission — please refresh the page and try again.';
+    } elseif (Auth::login($password)) {
         if ($remember) {
             Auth::remember($password);
         }
@@ -52,6 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php endif; ?>
 
             <form method="POST" class="space-y-6">
+                <?= Auth::csrfField() ?>
                 <div>
                     <label for="password" class="block text-sm font-medium text-slate-300 mb-2">Password</label>
                     <input

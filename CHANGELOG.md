@@ -10,19 +10,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `set_auth.sh` — CLI script to set/update admin password with automatic web-user ownership fix.
 - Video media support: X videos are now downloaded and posted to Bluesky as `app.bsky.embed.video` instead of a static thumbnail image.
+- CSRF protection on login and settings forms via `Auth::csrfToken()`/`csrfField()`/`verifyCsrf()`.
 
 ### Fixed
-- `Auth::getPasswordHash()` no longer crashes when the hash file exists but is unreadable (permission denied). Instead it logs the error and returns an invalid hash so login fails gracefully.
+- `Auth::getPasswordHash()` no longer crashes when the hash file exists but is unreadable.
 - `login.php` now shows "Password file not readable — run set_auth.sh" when the hash file has permission issues.
-- `api/fetch.php`: video media from X API now stores the best-quality MP4 variant URL instead of the static thumbnail.
-- `api/sync.php`: media download and embed building now branch on image vs video type.
+- `api/fetch.php`: video media stores best-quality MP4 variant URL instead of thumbnail.
+- `api/sync.php`: media download and embed building branch on image vs video type.
+- `SyncEngine::processQueueItem()` now writes to `synced_destinations` and `post_media`, matching the API sync path's destination model.
+- `SyncEngine` uses `TextProcessor::splitForBluesky()` instead of a duplicate `splitPost()` implementation (fixes thread notation overflow in worker path).
+- `since_id` cursor only advances after a post is successfully published, not when it is merely enqueued.
+- `api/fetch.php` dual-table writes (`fetched_posts` + `posts` + `post_media`) now wrapped in a transaction.
+- `MediaProcessor::cleanup()` called in `processQueueItem()` finally block so temp directories are not leaked.
+- `BlueskyClient::saveSession()` now sets `0600` on the session file.
 
 ### Changed
-- `Auth::getPasswordHash()` no longer crashes when the hash file exists but is unreadable (permission denied). Instead it logs the error and returns an invalid hash so login fails gracefully.
+- `Auth::getPasswordHash()` no longer crashes when the hash file exists but is unreadable.
 - `login.php` now shows "Password file not readable — run set_auth.sh" when the hash file has permission issues.
 
 ### Removed
 - `init_auth.php` (replaced by `set_auth.sh`).
+- `SyncEngine::splitPost()` — dead code removed (unified with `TextProcessor`).
 
 ## [0.6.0] - 2026-04-27
 
